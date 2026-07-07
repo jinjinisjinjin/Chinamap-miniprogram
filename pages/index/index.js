@@ -489,16 +489,13 @@ Page({
         ctx.drawImage(img, ix, iy, size, size)
       }
 
-      // 已开通省内打卡的省（有 GeoJSON 数据）用褚橙描边+浅橙底，提示"可点进去"
-      const isDrillable = mc.showBoundary && geo.hasProvinceGeo(province.id)
-
       // 省份路径
       ctx.beginPath()
       tracePath(ctx, province.d)
-      ctx.fillStyle = img ? 'transparent' : (isDrillable ? '#f7ece2' : template.empty)
+      ctx.fillStyle = img ? 'transparent' : template.empty
       ctx.fill()
-      ctx.strokeStyle = province.id === highlightId ? template.active : (isDrillable ? '#c46d3d' : template.border)
-      ctx.lineWidth = province.id === highlightId ? 2 : (isDrillable ? 1.6 : 1)
+      ctx.strokeStyle = province.id === highlightId ? template.active : template.border
+      ctx.lineWidth = province.id === highlightId ? 2 : 1
       ctx.lineJoin = 'round'
       ctx.stroke()
 
