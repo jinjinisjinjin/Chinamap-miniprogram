@@ -20,46 +20,33 @@
   color: #1e2b25;
 }
 
-/* ===== 顶层导航栏（面包屑） ===== */
+/* ===== 顶层导航栏（横向滚动标签条） ===== */
 .topnav {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  padding: 10rpx 4rpx 2rpx;
+  flex-direction: row;
+  white-space: nowrap;
+  padding: 6rpx 0 10rpx;
   font-family: "STKaiti", "KaiTi", serif;
+  border-bottom: 1rpx solid rgba(135, 119, 93, 0.16);
 }
-.nav-back {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #c46d3d;
-  margin-right: 4rpx;
-  padding: 0 6rpx;
-  line-height: 1;
-}
-.nav-crumb {
+.nav-tab {
+  flex: none;
   font-size: 26rpx;
   font-weight: 700;
   color: #6b6256;
-  padding: 4rpx 14rpx;
+  padding: 8rpx 22rpx;
+  margin-right: 10rpx;
   border-radius: 999rpx;
-  margin: 0 2rpx;
+  background: rgba(135, 119, 93, 0.08);
+  line-height: 1.2;
 }
-.nav-crumb.active {
+.nav-tab.active {
   color: #fff;
-  background: #c46d3d;
-  box-shadow: 0 6rpx 16rpx rgba(196, 109, 61, 0.28);
+  background: #1f7a67;
+  box-shadow: 0 6rpx 16rpx rgba(31, 122, 103, 0.28);
 }
-.nav-crumb.enter {
-  color: #c46d3d;
-  background: rgba(196, 109, 61, 0.14);
-}
-.nav-crumb.enter:active {
-  background: rgba(196, 109, 61, 0.22);
-}
-.nav-sep {
-  font-size: 22rpx;
-  color: #b7ad9b;
-  padding: 0 2rpx;
+.nav-tab:active {
+  opacity: 0.82;
 }
 
 /* ===== 地图 ===== */

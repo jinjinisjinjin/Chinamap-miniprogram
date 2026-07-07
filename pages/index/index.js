@@ -222,8 +222,8 @@ Page({
     regionIndex: 0,
     scopeLevel: 'country',
     scopeProvinceName: '',
-    navCrumbs: [],
-    showBackArrow: false,
+    navItems: [],
+    activeNavId: 'country',
   },
 
   onLoad() {
@@ -248,7 +248,7 @@ Page({
       templateName: templates[state.template].name,
     })
     this.syncPanel()
-    this.updateNav()
+    this.buildNavItems()
     this.initPrivacy()
   },
 
@@ -447,14 +447,41 @@ Page({
    * @param {{x,y,w,h}} area - 绘制区域
    * @param {Map|null} posterImages - 海报模式下的图片映射（null 时用 state.photos 中的 image）
    */
+  /* 计算一组 region 的实际内容包围盒（归一化坐标），用于省内视图 fit 居中 */
+  computeContentBounds(regions) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    regions.forEach(r => {
+      const b = r.bbox
+      if (!b || b.length < 4) return
+      minX = Math.min(minX, b[0])
+      minY = Math.min(minY, b[1])
+      maxX = Math.max(maxX, b[0] + b[2])
+      maxY = Math.max(maxY, b[1] + b[3])
+    })
+    if (!isFinite(minX)) return { x: 0, y: 0, w: NORM_VIEWBOX, h: NORM_VIEWBOX }
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+  },
+
   drawMap(ctx, area, posterImages, highlightId) {
     if (highlightId === undefined) highlightId = state.activeId
     const template = templates[state.template]
     const mc = this.getMapContext()
-    const scale = area.w / mc.viewbox
+    const isProvince = state.scope.level === 'province'
+    let scale = area.w / mc.viewbox
+    let tx = area.x
+    let ty = area.y
+
+    // 省内视图：按真实内容包围盒 fit 到画布并居中，保持宽高比，避免过小/溢出/偏移
+    if (isProvince && mc.viewbox === NORM_VIEWBOX) {
+      const cb = this.computeContentBounds(mc.regions)
+      const fit = 0.94
+      scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
+      tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
+      ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
+    }
 
     ctx.save()
-    ctx.translate(area.x, area.y)
+    ctx.translate(tx, ty)
     ctx.scale(scale, scale)
 
     /* --- 省份 / 地市 --- */
@@ -764,10 +791,10 @@ Page({
       scopeProvinceName: prov ? prov.name : '',
       regionNames: regs.map(r => r.name),
       regionIndex: 0,
+      activeNavId: provinceId,
     })
     this.renderMap()
     this.syncPanel()
-    this.updateNav()
   },
 
   /* ===== 返回全国层 ===== */
@@ -781,49 +808,43 @@ Page({
       scopeProvinceName: '',
       regionNames: state.provinces.map(p => p.name),
       regionIndex: Math.max(0, idx),
+      activeNavId: 'country',
     })
     this.renderMap()
     this.syncPanel()
-    this.updateNav()
   },
 
-  /* ===== 顶层导航栏（面包屑：全国 / 全国 › 浙江） ===== */
-  updateNav() {
-    const crumbs = []
-    if (state.scope.level === 'country') {
-      crumbs.push({ id: 'country', name: '全国', action: 'none', active: true })
-    } else {
-      crumbs.push({ id: 'country', name: '全国', action: 'back', active: false })
-      const prov = state.provinces.find(p => p.id === state.scope.provinceId)
-      crumbs.push({ id: state.scope.provinceId, name: prov ? prov.name : '', action: 'none', active: true })
-    }
-    this.setData({ navCrumbs: crumbs, showBackArrow: state.scope.level === 'province' })
+  /* ===== 顶层导航栏（横向滚动标签条：全国 / 各省） ===== */
+  buildNavItems() {
+    const provinces = state.provinces
+    const fujian = provinces.find(p => p.id === '350000')
+    const others = provinces.filter(p => p.id !== '350000')
+    const items = [{ id: 'country', name: '全国', type: 'country' }]
+    if (fujian) items.push({ id: fujian.id, name: fujian.name, type: 'province' })
+    others.forEach(p => items.push({ id: p.id, name: p.name, type: 'province' }))
+    this.setData({
+      navItems: items,
+      activeNavId: state.scope.level === 'province' ? state.scope.provinceId : 'country'
+    })
   },
 
-  onNavBack() {
-    this.exitProvince()
-  },
-
-  onNavCrumb(e) {
-    const action = e.currentTarget.dataset.action
+  onNavTap(e) {
+    const type = e.currentTarget.dataset.type
     const id = e.currentTarget.dataset.id
-    if (action === 'back') this.exitProvince()
-    else if (action === 'enter') this.enterProvince(id)
+    if (type === 'country') {
+      if (state.scope.level === 'province') this.exitProvince()
+    } else {
+      this.enterProvince(id)
+    }
   },
 
-  /* ===== 下拉选择（省 / 市） ===== */
+  /* ===== 下拉选择（省 / 市）：仅选中/高亮，不进省（入口在顶部标签条） ===== */
   onRegionPickerChange(e) {
     const idx = Number(e.detail.value)
     const mc = this.getMapContext()
     const region = mc.regions[idx]
     if (!region) return
-    // 全国层：下拉选择省份即进入该省（省内玩法）；省内层：仅选中城市
-    if (state.scope.level === 'country') {
-      if (geo.hasProvinceGeo(region.id)) this.enterProvince(region.id)
-      else this.selectRegion(region.id)
-    } else {
-      this.selectRegion(region.id)
-    }
+    this.selectRegion(region.id)
   },
 
   syncPanel() {

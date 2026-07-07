@@ -1,13 +1,15 @@
 <view class="app">
-  <!-- 顶层导航栏：面包屑 全国 / 全国 › 浙江 -->
-  <view class="topnav">
-    <text wx:if="{{showBackArrow}}" class="nav-back" bindtap="onNavBack">‹</text>
-    <block wx:for="{{navCrumbs}}" wx:key="id">
-      <text wx:if="{{index > 0}}" class="nav-sep">›</text>
-      <text class="nav-crumb {{item.active ? 'active' : ''}} {{item.action === 'enter' ? 'enter' : ''}}"
-            bindtap="onNavCrumb" data-action="{{item.action}}" data-id="{{item.id}}">{{item.name}}</text>
-    </block>
-  </view>
+  <!-- 顶层导航栏：横向滚动标签条（全国 / 各省） -->
+  <scroll-view class="topnav" scroll-x enable-flex>
+    <view
+      wx:for="{{navItems}}"
+      wx:key="id"
+      class="nav-tab {{item.id === activeNavId ? 'active' : ''}}"
+      data-id="{{item.id}}"
+      data-type="{{item.type}}"
+      bindtap="onNavTap"
+    >{{item.name}}</view>
+  </scroll-view>
 
   <!-- 顶栏 -->
   <view class="header">
@@ -42,7 +44,7 @@
         </view>
       </picker>
     </view>
-    <view class="region-hint" wx:if="{{scopeLevel === 'country'}}">下拉选择省份，即可进入省内看地级市 →</view>
+    <view class="region-hint" wx:if="{{scopeLevel === 'country'}}">顶部标签切换省份，下拉可在当前视图选择地区</view>
     <view class="region-hint" wx:if="{{scopeLevel === 'province'}}">点击地图城市或下拉选择，上传该城市照片</view>
     <view class="upload-btn {{!canUpload ? 'btn-disabled' : ''}}" bindtap="onUploadPhoto">
       <text class="upload-icon">+</text>
