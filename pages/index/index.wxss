@@ -31,6 +31,10 @@
 }
 .nav-tab {
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   font-size: 23rpx;
   font-weight: 700;
   color: #7a7062;
@@ -107,13 +111,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 84rpx;
+  min-height: 72rpx;
   border-radius: 16rpx;
   font-size: 28rpx;
-  font-weight: 700;
+  font-weight: 800;
   border: 1rpx solid transparent;
   transition: opacity 150ms ease;
-  box-shadow: 0 6rpx 16rpx rgba(55, 44, 30, 0.12);
+  box-shadow: 0 4rpx 14rpx rgba(55, 44, 30, 0.08);
 }
 
 .btn:active {
@@ -149,12 +153,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 80rpx;
+  min-height: 72rpx;
   border-radius: 16rpx;
-  font-size: 26rpx;
-  font-weight: 700;
+  font-size: 28rpx;
+  font-weight: 800;
   border: 1rpx solid transparent;
-  box-shadow: 0 6rpx 16rpx rgba(55, 44, 30, 0.10);
+  box-shadow: 0 4rpx 14rpx rgba(55, 44, 30, 0.08);
 }
 
 .action-btn.clear-btn {
@@ -241,13 +245,13 @@
   justify-content: center;
   gap: 12rpx;
   width: 100%;
-  min-height: 88rpx;
+  min-height: 72rpx;
   border-radius: 16rpx;
   background: #f7f1e8;
   color: #7b817b;
   font-size: 28rpx;
   font-weight: 800;
-  box-shadow: 0 8rpx 20rpx rgba(55, 44, 30, 0.12);
+  box-shadow: 0 4rpx 14rpx rgba(55, 44, 30, 0.08);
 }
 
 .upload-btn:active {
@@ -420,7 +424,7 @@
   line-height: 60rpx;
   text-align: center;
   font-size: 24rpx;
-  font-weight: 700;
+  font-weight: 800;
   color: #1e2b25;
   background: #f7f1e8;
   border-radius: 14rpx;

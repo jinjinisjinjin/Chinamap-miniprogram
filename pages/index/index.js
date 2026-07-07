@@ -539,7 +539,8 @@ Page({
     let scale = area.w / mc.viewbox
     let tx = area.x
     let ty = area.y
-    const insetSide = state.scope.provinceId === '710000' ? 'left' : 'right'
+    const insetSide = state.scope.provinceId === '710000' ? 'right' : 'right'
+    const insetTitleAbove = state.scope.provinceId === '710000'
 
     if (isProvince && mc.viewbox === NORM_VIEWBOX) {
       insetRegions = this.getProvinceIslands(mc.regions)
@@ -602,20 +603,6 @@ Page({
         ctx.stroke()
       }
 
-      // 选中省份标签（字号按当前缩放换算为恒定屏幕像素，避免省内放大后文字过大）
-      if (province.id === highlightId && province.bbox[2] > 22 && province.bbox[3] > 18) {
-        const fs = 13 / scale
-        ctx.font = `700 ${fs}px sans-serif`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.strokeStyle = 'rgba(255, 250, 241, 0.9)'
-        ctx.lineWidth = 3 / scale
-        ctx.lineJoin = 'round'
-        ctx.strokeText(province.name, province.label[0], province.label[1])
-        ctx.fillStyle = img ? '#ffffff' : template.label
-        ctx.fillText(province.name, province.label[0], province.label[1])
-      }
-
       ctx.restore()
     })
 
@@ -640,6 +627,22 @@ Page({
       ctx.stroke()
     }
 
+    // 选中区域名称标签（统一在最后绘制，确保压在所有图块填充之上，不再被相邻图块挡住）
+    const labelled = mainRegions.find(p => p.id === highlightId)
+    if (labelled && labelled.bbox[2] > 22 && labelled.bbox[3] > 18) {
+      const fs = 13 / scale
+      ctx.font = `700 ${fs}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.strokeStyle = 'rgba(255, 250, 241, 0.9)'
+      ctx.lineWidth = 3 / scale
+      ctx.lineJoin = 'round'
+      ctx.strokeText(labelled.name, labelled.label[0], labelled.label[1])
+      const li = getPhotoImage(this.photoKeyOf(labelled), posterImages)
+      ctx.fillStyle = li ? '#ffffff' : template.label
+      ctx.fillText(labelled.name, labelled.label[0], labelled.label[1])
+    }
+
     // 放大图（仅全国层）
     if (mc.showInsets) {
       this.drawSouthSeaInset(ctx, template, posterImages, highlightId)
@@ -650,7 +653,7 @@ Page({
 
     // 省内离岛缩小补充图（屏幕坐标悬浮卡片；海南在右下、台湾在左下）
     if (isProvince && insetRegions.length) {
-      this.drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions, insetSide)
+      this.drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions, insetSide, insetTitleAbove)
     }
   },
 
@@ -781,10 +784,12 @@ Page({
   },
 
   /* ===== 省内离岛/飞地缩小补充图（如海南·三沙市、台湾·金門/澎湖/馬祖） =====
-   * side: 'right'（海南，右下角）/ 'left'（台湾，左下角）。其余逻辑一致。 */
-  drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions, side) {
+   * side: 'right'（海南·三沙 / 台湾离岛，均右下角）。其余逻辑一致。
+   * titleAbove: 标题文字绘制在方框"上方"（台湾用，金門那一行文字放在方框上方）；否则绘制在方框内顶部（海南）。 */
+  drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions, side, titleAbove) {
     if (highlightId === undefined) highlightId = state.activeId
     if (side !== 'left' && side !== 'right') side = 'right'
+    titleAbove = !!titleAbove
 
     // 离岛合并包围盒（归一化坐标）
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -804,13 +809,13 @@ Page({
     const fx = side === 'left' ? area.x + margin : area.x + area.w - frameW - margin
     const fy = area.y + area.h - frameH - margin
 
-    // 内区（标题下方）
+    // 内区（标题下方；titleAbove 时标题在方框外，内区占满整张卡）
     const pad = 14
-    const titleH = 26
+    const titleH = titleAbove ? 0 : 26
     const innerX = fx + pad
-    const innerTop = fy + titleH
+    const innerTop = fy + titleH + (titleAbove ? 4 : 0)
     const innerW = frameW - pad * 2
-    const innerH = frameH - titleH - pad
+    const innerH = frameH - titleH - pad - (titleAbove ? 4 : 0)
 
     const s = Math.min(innerW / bw, innerH / bh) * 0.96
     const cw = bw * s, ch = bh * s
@@ -841,12 +846,16 @@ Page({
     ctx.lineWidth = 1.4
     ctx.stroke()
 
-    // 标题
+    // 标题（金門·澎湖·馬祖 等；台湾放在方框"上方"，其余放在方框内顶部）
     ctx.fillStyle = '#5d675f'
     ctx.font = `800 15px ${TEXT_FONT}`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
-    ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 14, fy + 19)
+    if (titleAbove) {
+      ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 2, fy - 8)
+    } else {
+      ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 14, fy + 19)
+    }
 
     // 离岛路径
     insetRegions.forEach(region => {
@@ -1081,8 +1090,7 @@ Page({
       templateName: templates[state.template].name,
     }
     if (state.scope.level === 'province') {
-      const prov = state.provinces.find(p => p.id === state.scope.provinceId)
-      patch.activeName = (prov ? prov.name : '') + ' · ' + (region ? region.name : '')
+      patch.activeName = region ? region.name : ''
     }
     if (photo) {
       patch.scaleValue = Math.round(photo.scale * 100)

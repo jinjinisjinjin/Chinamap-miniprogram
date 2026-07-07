@@ -141,7 +141,6 @@
   <view class="panel">
     <view class="panel-head">
       <text class="panel-label">选填资料</text>
-      <text class="panel-value">头像昵称</text>
     </view>
     <view class="profile-row">
       <view class="avatar-btn" bindtap="onUploadAvatar">
