@@ -31,16 +31,49 @@
   box-shadow: 0 6rpx 18rpx rgba(55, 44, 30, 0.10);
 }
 
-.back-btn {
+/* ===== 顶层导航栏（面包屑） ===== */
+.topnav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 18rpx 24rpx 14rpx;
+  background: linear-gradient(180deg, #fffaf1 0%, #f6efe2 100%);
+  border-bottom: 1rpx solid #e7ddca;
   font-family: "STKaiti", "KaiTi", serif;
+}
+.nav-back {
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #c46d3d;
+  margin-right: 6rpx;
+  padding: 0 10rpx;
+  line-height: 1;
+}
+.nav-crumb {
   font-size: 30rpx;
   font-weight: 700;
-  color: #1e2b25;
-  padding: 8rpx 18rpx;
-  border: 1rpx solid #d9d2c6;
-  border-radius: 14rpx;
-  background: rgba(255, 255, 255, 0.7);
-  align-self: center;
+  color: #6b6256;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  margin: 0 2rpx;
+}
+.nav-crumb.active {
+  color: #fff;
+  background: #c46d3d;
+  box-shadow: 0 6rpx 16rpx rgba(196, 109, 61, 0.28);
+}
+.nav-crumb.enter {
+  color: #c46d3d;
+  background: rgba(196, 109, 61, 0.12);
+  border: 1rpx solid rgba(196, 109, 61, 0.45);
+}
+.nav-crumb.enter:active {
+  background: rgba(196, 109, 61, 0.22);
+}
+.nav-sep {
+  font-size: 26rpx;
+  color: #b7ad9b;
+  padding: 0 2rpx;
 }
 
 .counter-num {
@@ -235,18 +268,6 @@
   margin-bottom: 16rpx;
   font-size: 22rpx;
   color: #a8aaa5;
-}
-
-.enter-province-btn {
-  margin: 4rpx 0 16rpx;
-  padding: 14rpx 20rpx;
-  text-align: center;
-  font-size: 26rpx;
-  font-weight: 700;
-  color: #fff;
-  background: #c46d3d;
-  border-radius: 14rpx;
-  box-shadow: 0 6rpx 16rpx rgba(196, 109, 61, 0.28);
 }
 
 /* ===== 上传按钮 ===== */

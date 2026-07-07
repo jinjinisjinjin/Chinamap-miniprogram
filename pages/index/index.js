@@ -223,8 +223,8 @@ Page({
     regionIndex: 0,
     scopeLevel: 'country',
     scopeProvinceName: '',
-    showBack: false,
-    canEnterProvince: false,
+    navCrumbs: [],
+    showBackArrow: false,
     totalRegions: 0,
   },
 
@@ -244,8 +244,6 @@ Page({
       regionIndex: defaultIndex,
       scopeLevel: 'country',
       scopeProvinceName: '',
-      showBack: false,
-      canEnterProvince: false,
       nickname: state.profile.nickname || '',
       avatarUrl: state.profile.avatar || '',
       hasAvatar: !!state.profile.avatar,
@@ -253,6 +251,7 @@ Page({
       templateName: templates[state.template].name,
     })
     this.syncPanel()
+    this.updateNav()
     this.initPrivacy()
   },
 
@@ -490,13 +489,16 @@ Page({
         ctx.drawImage(img, ix, iy, size, size)
       }
 
+      // 已开通省内打卡的省（有 GeoJSON 数据）用褚橙描边+浅橙底，提示"可点进去"
+      const isDrillable = mc.showBoundary && geo.hasProvinceGeo(province.id)
+
       // 省份路径
       ctx.beginPath()
       tracePath(ctx, province.d)
-      ctx.fillStyle = img ? 'transparent' : template.empty
+      ctx.fillStyle = img ? 'transparent' : (isDrillable ? '#f7ece2' : template.empty)
       ctx.fill()
-      ctx.strokeStyle = province.id === highlightId ? template.active : template.border
-      ctx.lineWidth = 1
+      ctx.strokeStyle = province.id === highlightId ? template.active : (isDrillable ? '#c46d3d' : template.border)
+      ctx.lineWidth = province.id === highlightId ? 2 : (isDrillable ? 1.6 : 1)
       ctx.lineJoin = 'round'
       ctx.stroke()
 
@@ -688,14 +690,8 @@ Page({
       const cssY = tapY - rect.top
       const region = this.hitTest(cssX, cssY)
       if (!region) return
-      if (state.scope.level === 'country') {
-        // 全国层：点击有数据的省直接进入省内，否则仅选中
-        if (geo.hasProvinceGeo(region.id)) this.enterProvince(region.id)
-        else this.selectRegion(region.id)
-      } else {
-        // 省内层：点击市即选中
-        this.selectRegion(region.id)
-      }
+      // 顶层导航栏是唯一进省入口（点地图/下拉只做"选中高亮"，不自动进省）
+      this.selectRegion(region.id)
     })
   },
 
@@ -782,11 +778,10 @@ Page({
       scopeProvinceName: prov ? prov.name : '',
       regionNames: regs.map(r => r.name),
       regionIndex: 0,
-      showBack: true,
-      canEnterProvince: false,
     })
     this.renderMap()
     this.syncPanel()
+    this.updateNav()
   },
 
   /* ===== 返回全国层 ===== */
@@ -800,17 +795,37 @@ Page({
       scopeProvinceName: '',
       regionNames: state.provinces.map(p => p.name),
       regionIndex: Math.max(0, idx),
-      showBack: false,
     })
     this.renderMap()
     this.syncPanel()
+    this.updateNav()
   },
 
-  /* ===== 进入当前选中的省（省内玩法入口） ===== */
-  onEnterCurrentProvince() {
-    if (state.scope.level === 'country' && state.activeId && geo.hasProvinceGeo(state.activeId)) {
-      this.enterProvince(state.activeId)
+  /* ===== 顶层导航栏（面包屑：全国 / 全国 › 浙江） ===== */
+  updateNav() {
+    const crumbs = []
+    if (state.scope.level === 'country') {
+      crumbs.push({ id: 'country', name: '全国', action: 'none', active: true })
+      state.provinces.forEach((p) => {
+        if (geo.hasProvinceGeo(p.id)) crumbs.push({ id: p.id, name: p.name, action: 'enter', active: false })
+      })
+    } else {
+      crumbs.push({ id: 'country', name: '全国', action: 'back', active: false })
+      const prov = state.provinces.find(p => p.id === state.scope.provinceId)
+      crumbs.push({ id: state.scope.provinceId, name: prov ? prov.name : '', action: 'none', active: true })
     }
+    this.setData({ navCrumbs: crumbs, showBackArrow: state.scope.level === 'province' })
+  },
+
+  onNavBack() {
+    this.exitProvince()
+  },
+
+  onNavCrumb(e) {
+    const action = e.currentTarget.dataset.action
+    const id = e.currentTarget.dataset.id
+    if (action === 'back') this.exitProvince()
+    else if (action === 'enter') this.enterProvince(id)
   },
 
   /* ===== 下拉选择（省 / 市） ===== */
@@ -819,12 +834,8 @@ Page({
     const mc = this.getMapContext()
     const region = mc.regions[idx]
     if (!region) return
-    if (state.scope.level === 'country') {
-      if (geo.hasProvinceGeo(region.id)) this.enterProvince(region.id)
-      else this.selectRegion(region.id)
-    } else {
-      this.selectRegion(region.id)
-    }
+    // 下拉只做"选中高亮"，进省由顶层导航栏触发
+    this.selectRegion(region.id)
   },
 
   syncPanel() {
@@ -839,12 +850,10 @@ Page({
       canUpload: !!region,
       hasActivePhoto: !!photo,
       templateName: templates[state.template].name,
-      canEnterProvince: state.scope.level === 'country' && region && geo.hasProvinceGeo(region.id),
     }
     if (state.scope.level === 'province') {
       const prov = state.provinces.find(p => p.id === state.scope.provinceId)
       patch.activeName = (prov ? prov.name : '') + ' · ' + (region ? region.name : '')
-      patch.canEnterProvince = false
     }
     if (photo) {
       patch.scaleValue = Math.round(photo.scale * 100)
