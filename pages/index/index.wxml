@@ -52,7 +52,7 @@
     </view>
     <view class="origin-row">
       <text class="origin-label">上传原图（更清晰）</text>
-      <switch class="origin-switch" checked="{{useOriginal}}" bindchange="onToggleOriginal" color="#1f7a67" />
+      <switch class="origin-switch" checked="{{useOriginal}}" bindchange="onToggleOriginal" color="#8a6a43" />
     </view>
     <view class="adjust-hint" wx:if="{{!hasActivePhoto}}">上传照片后可调整 缩放 / 左右 / 上下</view>
     <view class="adjustments" wx:if="{{hasActivePhoto}}">
@@ -67,7 +67,7 @@
             bindchange="onScaleChange"
             bindchanging="onScaleChanging"
             block-size="16"
-            activeColor="#1f7a67"
+            activeColor="#8a6a43"
             class="slider"
           />
         </view>
@@ -83,7 +83,7 @@
             bindchange="onXChange"
             bindchanging="onXChanging"
             block-size="16"
-            activeColor="#1f7a67"
+            activeColor="#8a6a43"
             class="slider"
           />
         </view>
@@ -99,7 +99,7 @@
             bindchange="onYChange"
             bindchanging="onYChanging"
             block-size="16"
-            activeColor="#1f7a67"
+            activeColor="#8a6a43"
             class="slider"
           />
         </view>

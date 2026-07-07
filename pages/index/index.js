@@ -15,18 +15,18 @@ const STORE_KEY = 'travel-map-data-v1'
 const templates = {
   minimal: {
     name: '极简白底', empty: '#e9e3d8', border: '#fffaf1',
-    active: '#1f7a67', label: '#31433a', paper: '#fffaf1',
-    title: '#1e2b25', accent: '#1f7a67'
+    active: '#8a6a43', label: '#31433a', paper: '#fffaf1',
+    title: '#1e2b25', accent: '#8a6a43', seam: '#d3c7b0'
   },
   journal: {
     name: '褚橙', empty: '#eadcc9', border: '#fff6e7',
     active: '#c46d3d', label: '#3c3329', paper: '#f8ead4',
-    title: '#2f251d', accent: '#c46d3d'
+    title: '#2f251d', accent: '#c46d3d', seam: '#d8c4a8'
   },
   ink: {
     name: '青绿', empty: '#dfe8dd', border: '#f6fbf4',
     active: '#376f6b', label: '#243935', paper: '#f6fbf4',
-    title: '#18332f', accent: '#376f6b'
+    title: '#18332f', accent: '#376f6b', seam: '#c2d2bf'
   }
 }
 
@@ -462,38 +462,68 @@ Page({
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
   },
 
-  /* ===== 省内离岛/飞地识别 =====
-   * 某些省份含"离主陆地极远"的区划（如海南·三沙市，其包围盒纵跨 y66→970 的南海诸岛），
-   * 若纳入 fit 会把主岛压缩到极小。这里返回这些离群区划，主视图将其排除、改绘为右下角缩小补充图。
-   * 启发式：逐个区划，若"去掉它后"整体包围盒在任一维度收缩 ≥40%，视为离群。
-   * 实测 34 省仅海南·三沙市触发，不影响其他省份。 */
-  getProvinceIslandOutliers(regions) {
+  /* ===== 省内离岛/飞地识别（组合判定）=====
+   * 两类离群都会被识别为"离岛"，主视图将其排除、改绘为缩小补充图（海南=右下、台湾=左下）：
+   *   (a) 极远 outliers：逐个区划，若"去掉它后"整体包围盒在任一维度收缩 ≥40%（如海南·三沙市，
+   *       其包围盒纵跨整个南海，去掉后主岛包围盒高度骤减）。
+   *   (b) 不连通成分：用"包围盒间距 ≤ TOL 即视为相邻"做并查集，主陆地=面积最大的连通块；
+   *       完全不与主陆地连通的区划（如台湾·金門/澎湖/馬祖）即为离岛。
+   * 两者并集后做安全过滤（离岛数须为少数），故普通连续省份（北京/天津等）不会误触发。 */
+  getProvinceIslands(regions) {
     if (!regions || regions.length < 3) return []
+    const n = regions.length
     const all = regions.map(r => r.bbox)
+
+    // (a) 极远 outlier
     const minX = Math.min.apply(null, all.map(b => b[0]))
     const maxX = Math.max.apply(null, all.map(b => b[0] + b[2]))
     const minY = Math.min.apply(null, all.map(b => b[1]))
     const maxY = Math.max.apply(null, all.map(b => b[1] + b[3]))
     const W = maxX - minX, H = maxY - minY
-    if (W <= 0 || H <= 0) return []
     const SHRINK = 0.40
-    const flagged = []
-    regions.forEach((r, i) => {
-      const xs = [], x2s = [], ys = [], y2s = []
-      regions.forEach((_, j) => {
-        if (j === i) return
-        xs.push(all[j][0]); x2s.push(all[j][0] + all[j][2])
-        ys.push(all[j][1]); y2s.push(all[j][1] + all[j][3])
+    const farSet = new Set()
+    if (W > 0 && H > 0) {
+      regions.forEach((r, i) => {
+        const xs = [], x2s = [], ys = [], y2s = []
+        for (let j = 0; j < n; j++) {
+          if (j === i) continue
+          xs.push(all[j][0]); x2s.push(all[j][0] + all[j][2])
+          ys.push(all[j][1]); y2s.push(all[j][1] + all[j][3])
+        }
+        const wwo = Math.max.apply(null, x2s) - Math.min.apply(null, xs)
+        const hwo = Math.max.apply(null, y2s) - Math.min.apply(null, ys)
+        const sw = (W - wwo) / W, sh = (H - hwo) / H
+        if (sw >= SHRINK || sh >= SHRINK) farSet.add(i)
       })
-      const wwo = Math.max.apply(null, x2s) - Math.min.apply(null, xs)
-      const hwo = Math.max.apply(null, y2s) - Math.min.apply(null, ys)
-      const sw = (W - wwo) / W
-      const sh = (H - hwo) / H
-      if (sw >= SHRINK || sh >= SHRINK) flagged.push(r)
-    })
-    // 仅当离群确属少数才生效，避免把本就离散的多块陆地整体误判
-    if (flagged.length === 0 || flagged.length >= regions.length * 0.5) return []
-    return flagged
+    }
+
+    // (b) 不连通成分
+    const parent = []
+    for (let i = 0; i < n; i++) parent[i] = i
+    const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
+    const union = (a, b) => { parent[find(a)] = find(b) }
+    const TOL = 14
+    const gap = (a, b) => {
+      const dx = Math.max(0, Math.max(b[0] - (a[0] + a[2]), a[0] - (b[0] + b[2])))
+      const dy = Math.max(0, Math.max(b[1] - (a[1] + a[3]), a[1] - (b[1] + b[3])))
+      return Math.hypot(dx, dy)
+    }
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      if (gap(all[i], all[j]) <= TOL) union(i, j)
+    }
+    const comps = {}
+    for (let i = 0; i < n; i++) { const r = find(i); (comps[r] = comps[r] || []).push(i) }
+    const keys = Object.keys(comps)
+    const areaSum = arr => arr.reduce((s, i) => s + all[i][2] * all[i][3], 0)
+    let mainKey = keys[0]
+    for (const k of keys) if (areaSum(comps[k]) > areaSum(comps[mainKey])) mainKey = k
+    const disjointSet = new Set()
+    for (const k of keys) if (k !== mainKey) comps[k].forEach(i => disjointSet.add(i))
+
+    const islandIdx = new Set()
+    for (let i = 0; i < n; i++) if (farSet.has(i) || disjointSet.has(i)) islandIdx.add(i)
+    if (islandIdx.size === 0 || islandIdx.size >= n * 0.5) return []
+    return regions.filter((_, i) => islandIdx.has(i))
   },
 
   drawMap(ctx, area, posterImages, highlightId) {
@@ -502,16 +532,17 @@ Page({
     const mc = this.getMapContext()
     const isProvince = state.scope.level === 'province'
 
-    // 省内视图：识别并分离"离岛/飞地"区划（如海南·三沙市）。主视图仅 fit 主陆地，
-    // 离岛改为右下角缩小补充图，避免主岛被压缩到极小、不居中。
+    // 省内视图：识别并分离"离岛/飞地"区划（海南·三沙市 / 台湾·金門·澎湖·馬祖等）。
+    // 主视图仅 fit 主陆地（居中放大），离岛改绘为缩小补充图；台湾在左侧、海南在右侧。
     let insetRegions = []
     let mainRegions = mc.regions
     let scale = area.w / mc.viewbox
     let tx = area.x
     let ty = area.y
+    const insetSide = state.scope.provinceId === '710000' ? 'left' : 'right'
 
     if (isProvince && mc.viewbox === NORM_VIEWBOX) {
-      insetRegions = this.getProvinceIslandOutliers(mc.regions)
+      insetRegions = this.getProvinceIslands(mc.regions)
       mainRegions = mc.regions.filter(r => insetRegions.indexOf(r) < 0)
       const cb = this.computeContentBounds(mainRegions)
       const fit = 0.94
@@ -554,19 +585,31 @@ Page({
       tracePath(ctx, province.d)
       ctx.fillStyle = img ? 'transparent' : template.empty
       ctx.fill()
-      ctx.strokeStyle = province.id === highlightId ? template.active : template.border
-      ctx.lineWidth = province.id === highlightId ? 2 : 1
-      ctx.lineJoin = 'round'
-      ctx.stroke()
+      // 描边：省内视图用"填充同色 bleed + 柔和 seam 色"让拼图严丝合缝（不再用刺眼白边）；全国视图保持原白边
+      if (isProvince) {
+        ctx.strokeStyle = template.empty
+        ctx.lineWidth = 2.2
+        ctx.lineJoin = 'round'
+        ctx.stroke()
+        ctx.strokeStyle = province.id === highlightId ? template.active : template.seam
+        ctx.lineWidth = province.id === highlightId ? 2.2 : 1
+        ctx.lineJoin = 'round'
+        ctx.stroke()
+      } else {
+        ctx.strokeStyle = province.id === highlightId ? template.active : template.border
+        ctx.lineWidth = province.id === highlightId ? 2 : 1
+        ctx.lineJoin = 'round'
+        ctx.stroke()
+      }
 
-      // 选中省份标签
+      // 选中省份标签（字号按当前缩放换算为恒定屏幕像素，避免省内放大后文字过大）
       if (province.id === highlightId && province.bbox[2] > 22 && province.bbox[3] > 18) {
-        const fs = 22
+        const fs = 13 / scale
         ctx.font = `700 ${fs}px sans-serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.strokeStyle = 'rgba(255, 250, 241, 0.88)'
-        ctx.lineWidth = 4
+        ctx.strokeStyle = 'rgba(255, 250, 241, 0.9)'
+        ctx.lineWidth = 3 / scale
         ctx.lineJoin = 'round'
         ctx.strokeText(province.name, province.label[0], province.label[1])
         ctx.fillStyle = img ? '#ffffff' : template.label
@@ -586,13 +629,13 @@ Page({
       ctx.stroke()
     }
 
-    // 选中省份高亮描边（仅主视图区域）
+    // 选中省份高亮描边（仅主视图区域；线宽按缩放换算为恒定屏幕像素）
     const active = mainRegions.find(p => p.id === highlightId)
     if (active) {
       ctx.beginPath()
       tracePath(ctx, active.d)
       ctx.strokeStyle = template.active
-      ctx.lineWidth = 4
+      ctx.lineWidth = 3 / scale
       ctx.lineJoin = 'round'
       ctx.stroke()
     }
@@ -605,9 +648,9 @@ Page({
 
     ctx.restore()
 
-    // 省内离岛缩小补充图（屏幕坐标，右下角悬浮卡片）
+    // 省内离岛缩小补充图（屏幕坐标悬浮卡片；海南在右下、台湾在左下）
     if (isProvince && insetRegions.length) {
-      this.drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions)
+      this.drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions, insetSide)
     }
   },
 
@@ -737,9 +780,11 @@ Page({
     ctx.restore()
   },
 
-  /* ===== 省内离岛/飞地缩小补充图（如海南·三沙市/南海诸岛） ===== */
-  drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions) {
+  /* ===== 省内离岛/飞地缩小补充图（如海南·三沙市、台湾·金門/澎湖/馬祖） =====
+   * side: 'right'（海南，右下角）/ 'left'（台湾，左下角）。其余逻辑一致。 */
+  drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions, side) {
     if (highlightId === undefined) highlightId = state.activeId
+    if (side !== 'left' && side !== 'right') side = 'right'
 
     // 离岛合并包围盒（归一化坐标）
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -752,11 +797,11 @@ Page({
     const bw = maxX - minX, bh = maxY - minY
     if (bw <= 0 || bh <= 0) return
 
-    // 卡片尺寸（屏幕/area 坐标，右下角悬浮）
+    // 卡片尺寸（屏幕/area 坐标，悬浮于左下或右下）
     const margin = 12
-    const frameW = Math.min(area.w * 0.32, 240)
-    const frameH = frameW * 0.80
-    const fx = area.x + area.w - frameW - margin
+    const frameW = Math.min(area.w * 0.34, 250)
+    const frameH = frameW * 0.78
+    const fx = side === 'left' ? area.x + margin : area.x + area.w - frameW - margin
     const fy = area.y + area.h - frameH - margin
 
     // 内区（标题下方）
@@ -798,7 +843,7 @@ Page({
 
     // 标题
     ctx.fillStyle = '#5d675f'
-    ctx.font = `800 17px ${TEXT_FONT}`
+    ctx.font = `800 15px ${TEXT_FONT}`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
     ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 14, fy + 19)
