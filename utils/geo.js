@@ -12,7 +12,7 @@ const NORM_VIEWBOX = 1000
 
 // 省级行政区数据源（按需添加，初期仅浙江）。key = 全国 provinces 的 id（即 adcode）
 const GEO_SOURCES = {
-  '330000': require('./geo/zhejiang.json'), // 浙江
+  '330000': require('./geo/zhejiang.js'), // 浙江（须用 .js 模块；小程序 require 不支持加载 .json）
 }
 
 // 将单个 [lon, lat] 归一化到 NORM_VIEWBOX
