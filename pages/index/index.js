@@ -462,30 +462,74 @@ Page({
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
   },
 
+  /* ===== 省内离岛/飞地识别 =====
+   * 某些省份含"离主陆地极远"的区划（如海南·三沙市，其包围盒纵跨 y66→970 的南海诸岛），
+   * 若纳入 fit 会把主岛压缩到极小。这里返回这些离群区划，主视图将其排除、改绘为右下角缩小补充图。
+   * 启发式：逐个区划，若"去掉它后"整体包围盒在任一维度收缩 ≥40%，视为离群。
+   * 实测 34 省仅海南·三沙市触发，不影响其他省份。 */
+  getProvinceIslandOutliers(regions) {
+    if (!regions || regions.length < 3) return []
+    const all = regions.map(r => r.bbox)
+    const minX = Math.min.apply(null, all.map(b => b[0]))
+    const maxX = Math.max.apply(null, all.map(b => b[0] + b[2]))
+    const minY = Math.min.apply(null, all.map(b => b[1]))
+    const maxY = Math.max.apply(null, all.map(b => b[1] + b[3]))
+    const W = maxX - minX, H = maxY - minY
+    if (W <= 0 || H <= 0) return []
+    const SHRINK = 0.40
+    const flagged = []
+    regions.forEach((r, i) => {
+      const xs = [], x2s = [], ys = [], y2s = []
+      regions.forEach((_, j) => {
+        if (j === i) return
+        xs.push(all[j][0]); x2s.push(all[j][0] + all[j][2])
+        ys.push(all[j][1]); y2s.push(all[j][1] + all[j][3])
+      })
+      const wwo = Math.max.apply(null, x2s) - Math.min.apply(null, xs)
+      const hwo = Math.max.apply(null, y2s) - Math.min.apply(null, ys)
+      const sw = (W - wwo) / W
+      const sh = (H - hwo) / H
+      if (sw >= SHRINK || sh >= SHRINK) flagged.push(r)
+    })
+    // 仅当离群确属少数才生效，避免把本就离散的多块陆地整体误判
+    if (flagged.length === 0 || flagged.length >= regions.length * 0.5) return []
+    return flagged
+  },
+
   drawMap(ctx, area, posterImages, highlightId) {
     if (highlightId === undefined) highlightId = state.activeId
     const template = templates[state.template]
     const mc = this.getMapContext()
     const isProvince = state.scope.level === 'province'
+
+    // 省内视图：识别并分离"离岛/飞地"区划（如海南·三沙市）。主视图仅 fit 主陆地，
+    // 离岛改为右下角缩小补充图，避免主岛被压缩到极小、不居中。
+    let insetRegions = []
+    let mainRegions = mc.regions
     let scale = area.w / mc.viewbox
     let tx = area.x
     let ty = area.y
 
-    // 省内视图：按真实内容包围盒 fit 到画布并居中，保持宽高比，避免过小/溢出/偏移
     if (isProvince && mc.viewbox === NORM_VIEWBOX) {
-      const cb = this.computeContentBounds(mc.regions)
+      insetRegions = this.getProvinceIslandOutliers(mc.regions)
+      mainRegions = mc.regions.filter(r => insetRegions.indexOf(r) < 0)
+      const cb = this.computeContentBounds(mainRegions)
       const fit = 0.94
       scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
       tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
       ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
     }
 
+    // 记录当前变换矩阵，供点击命中检测使用（同时修复省内视图点击偏移）
+    this._mapXF = { tx, ty, scale, viewbox: mc.viewbox, isProvince }
+    this._provinceInset = null
+
     ctx.save()
     ctx.translate(tx, ty)
     ctx.scale(scale, scale)
 
-    /* --- 省份 / 地市 --- */
-    mc.regions.forEach(province => {
+    /* --- 省份 / 地市（主视图，不含离岛） --- */
+    mainRegions.forEach(province => {
       const photo = state.photos.get(this.photoKeyOf(province))
       const img = getPhotoImage(this.photoKeyOf(province), posterImages)
 
@@ -542,8 +586,8 @@ Page({
       ctx.stroke()
     }
 
-    // 选中省份高亮描边
-    const active = mc.regions.find(p => p.id === highlightId)
+    // 选中省份高亮描边（仅主视图区域）
+    const active = mainRegions.find(p => p.id === highlightId)
     if (active) {
       ctx.beginPath()
       tracePath(ctx, active.d)
@@ -560,6 +604,11 @@ Page({
     }
 
     ctx.restore()
+
+    // 省内离岛缩小补充图（屏幕坐标，右下角悬浮卡片）
+    if (isProvince && insetRegions.length) {
+      this.drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions)
+    }
   },
 
   /* ===== 南海诸岛放大图 ===== */
@@ -688,6 +737,107 @@ Page({
     ctx.restore()
   },
 
+  /* ===== 省内离岛/飞地缩小补充图（如海南·三沙市/南海诸岛） ===== */
+  drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions) {
+    if (highlightId === undefined) highlightId = state.activeId
+
+    // 离岛合并包围盒（归一化坐标）
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    insetRegions.forEach(r => {
+      const b = r.bbox
+      minX = Math.min(minX, b[0]); minY = Math.min(minY, b[1])
+      maxX = Math.max(maxX, b[0] + b[2]); maxY = Math.max(maxY, b[1] + b[3])
+    })
+    if (!isFinite(minX)) return
+    const bw = maxX - minX, bh = maxY - minY
+    if (bw <= 0 || bh <= 0) return
+
+    // 卡片尺寸（屏幕/area 坐标，右下角悬浮）
+    const margin = 12
+    const frameW = Math.min(area.w * 0.32, 240)
+    const frameH = frameW * 0.80
+    const fx = area.x + area.w - frameW - margin
+    const fy = area.y + area.h - frameH - margin
+
+    // 内区（标题下方）
+    const pad = 14
+    const titleH = 26
+    const innerX = fx + pad
+    const innerTop = fy + titleH
+    const innerW = frameW - pad * 2
+    const innerH = frameH - titleH - pad
+
+    const s = Math.min(innerW / bw, innerH / bh) * 0.96
+    const cw = bw * s, ch = bh * s
+    const ox = innerX + (innerW - cw) / 2 - minX * s
+    const oy = innerTop + (innerH - ch) / 2 - minY * s
+
+    // 记录命中信息供 hitTest 使用
+    this._provinceInset = {
+      frame: { x: fx, y: fy, w: frameW, h: frameH },
+      inner: { ox, oy, s },
+      regions: insetRegions
+    }
+
+    ctx.save()
+    // 悬浮卡片阴影
+    ctx.shadowColor = 'rgba(54, 45, 30, 0.22)'
+    ctx.shadowBlur = 20
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 8
+    roundRect(ctx, fx, fy, frameW, frameH, 16)
+    ctx.fillStyle = 'rgba(255, 250, 241, 0.95)'
+    ctx.fill()
+    // 关闭阴影再描边，避免阴影被边框叠加
+    ctx.shadowColor = 'transparent'
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetY = 0
+    ctx.strokeStyle = 'rgba(135, 119, 93, 0.42)'
+    ctx.lineWidth = 1.4
+    ctx.stroke()
+
+    // 标题
+    ctx.fillStyle = '#5d675f'
+    ctx.font = `800 17px ${TEXT_FONT}`
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 14, fy + 19)
+
+    // 离岛路径
+    insetRegions.forEach(region => {
+      const key = state.scope.level === 'province' ? state.scope.provinceId + ':' + region.id : region.id
+      const img = getPhotoImage(key, posterImages)
+
+      if (img) {
+        ctx.save()
+        ctx.translate(ox, oy)
+        ctx.scale(s, s)
+        ctx.beginPath()
+        tracePath(ctx, region.d)
+        ctx.clip()
+        ctx.translate(-ox, -oy)
+        ctx.scale(1 / s, 1 / s)
+        drawCoverImage(ctx, img, innerX, innerTop, innerW, innerH)
+        ctx.restore()
+      }
+
+      ctx.save()
+      ctx.translate(ox, oy)
+      ctx.scale(s, s)
+      ctx.beginPath()
+      tracePath(ctx, region.d)
+      ctx.fillStyle = img ? 'transparent' : template.empty
+      ctx.fill()
+      ctx.strokeStyle = region.id === highlightId ? template.active : '#d8cdb9'
+      ctx.lineWidth = 1.8 / s
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+      ctx.restore()
+    })
+
+    ctx.restore()
+  },
+
   /* ===== 点击省份（命中检测） ===== */
   onMapTap(e) {
     if (!mapCtx) return
@@ -710,54 +860,81 @@ Page({
 
   hitTest(cssX, cssY) {
     const ctx = mapCtx
-    const viewbox = this.getMapContext().viewbox
-    // 转换为逻辑坐标
-    const lx = cssX * (viewbox / mapDispW)
-    const ly = cssY * (viewbox / mapDispH)
+    const sx = mapDispW / MAP_VIEWBOX
+    const sy = mapDispH / MAP_VIEWBOX
 
-    // 优先检查放大图区域（仅全国层）
+    // ① 省内离岛补充图优先命中（屏幕坐标）
+    const inset = this._provinceInset
+    if (inset && state.scope.level === 'province') {
+      const f = inset.frame
+      if (cssX >= f.x && cssX <= f.x + f.w && cssY >= f.y && cssY <= f.y + f.h) {
+        ctx.save()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.scale(mapDpr, mapDpr)
+        ctx.translate(inset.inner.ox, inset.inner.oy)
+        ctx.scale(inset.inner.s, inset.inner.s)
+        let hit = null
+        for (const region of inset.regions) {
+          ctx.beginPath()
+          tracePath(ctx, region.d)
+          if (ctx.isPointInPath(cssX * mapDpr, cssY * mapDpr)) { hit = region; break }
+        }
+        ctx.restore()
+        return hit || inset.regions[0]
+      }
+    }
+
+    // ② 全国层放大图（南海诸岛 / 港澳）命中
     if (this.getMapContext().showInsets) {
       const ssData = getSouthSeaInsetData()
       if (ssData) {
         const frame = { x: 828, y: 842, w: 286, h: 250 }
-        if (lx >= frame.x && lx <= frame.x + frame.w && ly >= frame.y && ly <= frame.y + frame.h) {
+        if (cssX >= frame.x * sx && cssX <= (frame.x + frame.w) * sx &&
+            cssY >= frame.y * sy && cssY <= (frame.y + frame.h) * sy) {
           return ssData.province
         }
       }
       const hkData = getHKMacauInsetData()
       if (hkData) {
         const frame = { x: 932, y: 664, w: 182, h: 152 }
-        if (lx >= frame.x && lx <= frame.x + frame.w && ly >= frame.y && ly <= frame.y + frame.h) {
-          const mid = frame.x + frame.w / 2
-          return lx < mid ? hkData.regions[0] : hkData.regions[hkData.regions.length - 1]
+        if (cssX >= frame.x * sx && cssX <= (frame.x + frame.w) * sx &&
+            cssY >= frame.y * sy && cssY <= (frame.y + frame.h) * sy) {
+          const mid = (frame.x + frame.w / 2) * sx
+          return cssX < mid ? hkData.regions[0] : hkData.regions[hkData.regions.length - 1]
         }
       }
     }
 
-    // 检查主区域路径（从后往前，顶层优先）
+    // ③ 主区域命中（使用 drawMap 记录的真实变换，支持省内 fit 居中）
+    const xf = this._mapXF
+    if (!xf) return null
+
     ctx.save()
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.scale(mapDpr, mapDpr)
-    ctx.scale(mapDispW / viewbox, mapDispH / viewbox)
+    ctx.translate(xf.tx, xf.ty)
+    ctx.scale(xf.scale, xf.scale)
 
-    const regions = this.getMapContext().regions
+    const mc = this.getMapContext()
+    const regions = state.scope.level === 'province'
+      ? mc.regions.filter(r => !inset || inset.regions.indexOf(r) < 0)
+      : mc.regions
+
+    const nx = (cssX - xf.tx) / xf.scale
+    const ny = (cssY - xf.ty) / xf.scale
+
     for (let i = regions.length - 1; i >= 0; i--) {
       const province = regions[i]
-      // 快速 bbox 过滤
       const [bx, by, bw, bh] = province.bbox
-      if (lx < bx - 5 || lx > bx + bw + 5 || ly < by - 5 || ly > by + bh + 5) continue
-      // 精确检测
+      if (nx < bx - 5 || nx > bx + bw + 5 || ny < by - 5 || ny > by + bh + 5) continue
       ctx.beginPath()
       tracePath(ctx, province.d)
-      const canvasX = cssX * mapDpr
-      const canvasY = cssY * mapDpr
       try {
-        if (ctx.isPointInPath(canvasX, canvasY)) {
+        if (ctx.isPointInPath(cssX * mapDpr, cssY * mapDpr)) {
           ctx.restore()
           return province
         }
       } catch (err) {
-        // isPointInPath 不可用时回退到 bbox
         ctx.restore()
         return province
       }
