@@ -1,0 +1,25 @@
+page {
+  --bg: #f3efe8;
+  --surface: #fffaf1;
+  --surface-strong: #ffffff;
+  --ink: #1e2b25;
+  --muted: #7b817b;
+  --line: #d9d2c6;
+  --empty: #e9e3d8;
+  --accent: #1f7a67;
+  --accent-strong: #155e51;
+  --warm: #d68b51;
+  --display-font: "STKaiti", "KaiTi", serif;
+  --serif-font: "STSong", "SimSun", serif;
+
+  background: linear-gradient(160deg, rgba(31, 122, 103, 0.06), transparent 40%),
+              linear-gradient(300deg, rgba(214, 139, 81, 0.08), transparent 45%),
+              var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  min-height: 100vh;
+}
+
+view, text, button, input, textarea {
+  box-sizing: border-box;
+}

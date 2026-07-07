@@ -1,0 +1,206 @@
+<view class="app">
+  <!-- 顶栏 -->
+  <view class="header">
+    <text class="title">我的旅行地图</text>
+    <view class="counter">
+      <text class="counter-num">{{litCount}}</text>
+      <text class="counter-total">/ {{totalProvinces}}</text>
+    </view>
+  </view>
+
+  <!-- 地图 -->
+  <view class="map-stage">
+    <canvas
+      type="2d"
+      id="mapCanvas"
+      class="map-canvas"
+      bindtap="onMapTap"
+    ></canvas>
+    <text class="map-brand">足迹中国</text>
+  </view>
+
+  <!-- 当前地区 -->
+  <view class="panel">
+    <view class="panel-head">
+      <text class="panel-label">当前地区</text>
+      <picker
+        class="region-picker"
+        mode="selector"
+        range="{{provinceNames}}"
+        value="{{provinceIndex}}"
+        bindchange="onProvincePickerChange"
+      >
+        <view class="picker-display">
+          <text class="picker-text">{{activeName}}</text>
+          <text class="picker-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+    <view class="region-hint">点击地区名，从下拉列表选择省份 →</view>
+    <view class="upload-btn {{!canUpload ? 'btn-disabled' : ''}}" bindtap="onUploadPhoto">
+      <text class="upload-icon">+</text>
+      <text>{{uploadLabel}}</text>
+    </view>
+    <view class="origin-row">
+      <text class="origin-label">上传原图（更清晰）</text>
+      <switch class="origin-switch" checked="{{useOriginal}}" bindchange="onToggleOriginal" color="#1f7a67" />
+    </view>
+    <view class="adjust-hint" wx:if="{{!hasActivePhoto}}">上传照片后可调整 缩放 / 左右 / 上下</view>
+    <view class="adjustments" wx:if="{{hasActivePhoto}}">
+      <view class="slider-row">
+        <text class="slider-label">缩放</text>
+        <view class="slider-wrap">
+          <slider
+            min="35"
+            max="280"
+            step="1"
+            value="{{scaleValue}}"
+            bindchange="onScaleChange"
+            bindchanging="onScaleChanging"
+            block-size="16"
+            activeColor="#1f7a67"
+            class="slider"
+          />
+        </view>
+      </view>
+      <view class="slider-row">
+        <text class="slider-label">左右</text>
+        <view class="slider-wrap">
+          <slider
+            min="-90"
+            max="90"
+            step="1"
+            value="{{xValue}}"
+            bindchange="onXChange"
+            bindchanging="onXChanging"
+            block-size="16"
+            activeColor="#1f7a67"
+            class="slider"
+          />
+        </view>
+      </view>
+      <view class="slider-row">
+        <text class="slider-label">上下</text>
+        <view class="slider-wrap">
+          <slider
+            min="-90"
+            max="90"
+            step="1"
+            value="{{yValue}}"
+            bindchange="onYChange"
+            bindchanging="onYChanging"
+            block-size="16"
+            activeColor="#1f7a67"
+            class="slider"
+          />
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 清空 / 删除当前区域照片 -->
+  <view class="region-actions">
+    <view class="action-btn clear-btn {{!canGenerate ? 'btn-disabled' : ''}}" bindtap="onClear">清空</view>
+    <view class="action-btn del-btn {{!hasActivePhoto ? 'btn-disabled' : ''}}" bindtap="onDeleteCurrentPhoto">删除当前区域照片</view>
+  </view>
+
+  <!-- 海报模板 -->
+  <view class="panel">
+    <view class="panel-head">
+      <text class="panel-label">海报模板</text>
+    </view>
+    <view class="template-grid">
+      <view
+        class="template-chip {{currentTemplate === 'minimal' ? 'active' : ''}}"
+        data-template="minimal"
+        bindtap="onTemplateChange"
+      >极简</view>
+      <view
+        class="template-chip {{currentTemplate === 'journal' ? 'active' : ''}}"
+        data-template="journal"
+        bindtap="onTemplateChange"
+      >褚橙</view>
+      <view
+        class="template-chip {{currentTemplate === 'ink' ? 'active' : ''}}"
+        data-template="ink"
+        bindtap="onTemplateChange"
+      >青绿</view>
+    </view>
+  </view>
+
+  <!-- 选填资料 -->
+  <view class="panel">
+    <view class="panel-head">
+      <text class="panel-label">选填资料</text>
+      <text class="panel-value">头像昵称</text>
+    </view>
+    <view class="profile-row">
+      <view class="avatar-btn" bindtap="onUploadAvatar">
+        <image wx:if="{{hasAvatar}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar-placeholder">
+          <text class="avatar-placeholder-text">头像</text>
+          <text class="avatar-hint">点此上传</text>
+        </view>
+      </view>
+      <view class="profile-fields">
+        <input
+          class="nickname-input"
+          type="nickname"
+          maxlength="16"
+          value="{{nickname}}"
+          bindinput="onNicknameInput"
+          bindblur="onNicknameInput"
+          bindnicknamereview="onNicknameReview"
+          placeholder="点此填微信昵称"
+        />
+        <view class="profile-actions">
+          <button class="mini-btn wx-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">用微信头像</button>
+          <button wx:if="{{hasAvatar}}" class="mini-btn del-btn" bindtap="onDeleteAvatar">删除</button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作工具栏（海报上方） -->
+  <view class="toolbar">
+    <button class="btn ghost share-btn" open-type="share">分享好友</button>
+    <view class="btn primary {{!canGenerate ? 'btn-disabled' : ''}}" bindtap="onGeneratePoster">生成海报</view>
+  </view>
+
+  <!-- 海报预览 -->
+  <view class="panel">
+    <view class="panel-head">
+      <text class="panel-label">海报预览</text>
+      <view class="save-link {{hasPoster ? '' : 'disabled'}}" bindtap="onSavePoster">保存图片</view>
+    </view>
+    <view class="poster-frame" bindtap="onPosterTap">
+      <image wx:if="{{hasPoster}}" class="poster-img" src="{{posterUrl}}" mode="aspectFit" />
+      <text wx:else class="poster-empty">生成后预览</text>
+    </view>
+  </view>
+
+  <!-- 隐私授权弹窗 -->
+  <view class="privacy-mask" wx:if="{{privacyVisible}}">
+    <view class="privacy-dialog">
+      <view class="privacy-title">隐私授权</view>
+      <view class="privacy-body">
+        使用前请阅读并同意
+        <text class="privacy-link" bindtap="onOpenPrivacyWeb">{{privacyContractName}}</text>
+        。我们仅在你的设备本地处理照片与资料，不会上传任何服务器。
+      </view>
+      <view class="privacy-actions">
+        <view class="privacy-btn ghost" bindtap="onRefusePrivacy">拒绝</view>
+        <view class="privacy-btn primary" bindtap="onAgreePrivacy">同意并使用</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 海报放大弹窗 -->
+  <view class="poster-modal {{posterModalOpen ? 'open' : ''}}" bindtap="onCloseModal">
+    <image wx:if="{{posterUrl}}" class="modal-img" src="{{posterUrl}}" mode="widthFix" />
+    <view class="modal-close" catchtap="onCloseModal">×</view>
+  </view>
+
+  <!-- 隐藏的海报画布 -->
+  <canvas type="2d" id="posterCanvas" class="poster-canvas-hidden"></canvas>
+</view>
