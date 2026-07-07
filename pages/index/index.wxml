@@ -12,10 +12,6 @@
   <!-- 顶栏 -->
   <view class="header">
     <text class="title">我的旅行地图</text>
-    <view class="counter">
-      <text class="counter-num">{{litCount}}</text>
-      <text class="counter-total">/ {{totalRegions}}</text>
-    </view>
   </view>
 
   <!-- 地图 -->

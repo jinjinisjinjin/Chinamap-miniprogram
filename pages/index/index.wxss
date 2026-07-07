@@ -20,17 +20,6 @@
   color: #1e2b25;
 }
 
-.counter {
-  display: flex;
-  align-items: baseline;
-  gap: 4rpx;
-  padding: 12rpx 20rpx;
-  border-radius: 16rpx;
-  background: rgba(255, 250, 241, 0.9);
-  white-space: nowrap;
-  box-shadow: 0 6rpx 18rpx rgba(55, 44, 30, 0.07);
-}
-
 /* ===== 顶层导航栏（面包屑） ===== */
 .topnav {
   display: flex;
@@ -71,17 +60,6 @@
   font-size: 22rpx;
   color: #b7ad9b;
   padding: 0 2rpx;
-}
-
-.counter-num {
-  font-size: 40rpx;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.counter-total {
-  font-size: 22rpx;
-  color: #7b817b;
 }
 
 /* ===== 地图 ===== */

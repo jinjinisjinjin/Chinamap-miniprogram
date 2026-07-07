@@ -198,7 +198,6 @@ function getHKMacauInsetData() {
 /* ===== Page ===== */
 Page({
   data: {
-    litCount: 0,
     activeName: '',
     uploadLabel: '上传照片',
     templateName: '极简白底',
@@ -225,7 +224,6 @@ Page({
     scopeProvinceName: '',
     navCrumbs: [],
     showBackArrow: false,
-    totalRegions: 0,
   },
 
   onLoad() {
@@ -237,7 +235,6 @@ Page({
     state.activeId = guangdong ? guangdong.id : (provinces[0] ? provinces[0].id : '')
     const defaultIndex = guangdong ? provinces.indexOf(guangdong) : 0
     this.setData({
-      totalRegions: provinces.length,
       canGenerate: provinces.length > 0,
       // 下拉选择器：省份名数组 + 当前选中下标，下标与 state.provinces 一一对应，保证地名↔位置映射准确
       regionNames: provinces.map(p => p.name),
@@ -427,14 +424,6 @@ Page({
     if (!state.activeId) return ''
     if (state.scope.level === 'province') return state.scope.provinceId + ':' + state.activeId
     return state.activeId
-  },
-
-  // 当前层级已点亮数量
-  countLit() {
-    const mc = this.getMapContext()
-    let n = 0
-    mc.regions.forEach((r) => { if (state.photos.has(this.photoKeyOf(r))) n++ })
-    return n
   },
 
   /* ===== 地图渲染 ===== */
@@ -844,8 +833,6 @@ Page({
     const patch = {
       activeName: region ? region.name : '待加载',
       uploadLabel: photo ? '更换照片' : '上传照片',
-      litCount: this.countLit(),
-      totalRegions: mc.regions.length,
       canUpload: !!region,
       hasActivePhoto: !!photo,
       templateName: templates[state.template].name,
@@ -901,7 +888,7 @@ Page({
       : ''
     if (n === 0) return '还没有点亮' + prefix + '任何地方'
     if (n <= 6) return '去过 ' + prefix + names.join(' · ')
-    return '去过 ' + prefix + names.slice(0, 6).join(' · ') + ' 等 ' + n + ' 个地方'
+    return '去过 ' + prefix + names.slice(0, 6).join(' · ') + ' …'
   },
 
   /* ===== 照片上传 ===== */
@@ -1175,13 +1162,10 @@ Page({
       : '我的旅行地图'
     ctx.fillText(titleText, 130, 180)
 
-    // 统计
+    // 去过的地方（仅列出地名，不含计数）
     ctx.fillStyle = template.accent
     ctx.font = `700 35px ${TEXT_FONT}`
-    const statText = state.scope.level === 'province'
-      ? `已点亮 ${this.countLit()} / ${mc.regions.length} 个市`
-      : `已点亮 ${this.countLit()} / ${mc.regions.length} 个地区`
-    ctx.fillText(statText, 134, 244)
+    ctx.fillText(this.getVisitedText(), 134, 244)
 
     // 头像 + 昵称
     const nickname = state.profile.nickname
@@ -1281,27 +1265,23 @@ Page({
 
   /* ===== 分享（转发好友 / 朋友圈） ===== */
   onShareAppMessage() {
-    const lit = this.countLit()
     const scopeName = state.scope.level === 'province'
       ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '')
       : ''
     const hasPoster = !!this.data.posterUrl
-    const title = scopeName
-      ? `${scopeName}已点亮 ${lit} 个市`
-      : `我的旅行地图，已点亮 ${lit} 个地区`
+    const title = scopeName ? scopeName + '打卡地图' : '我的旅行地图'
     return {
-      title: hasPoster ? title : `我已经点亮了 ${lit} 个旅行地区，来看看吧`,
+      title: hasPoster ? title : '快来看看我的旅行地图',
       path: '/pages/index/index',
       imageUrl: this.data.posterUrl || ''
     }
   },
 
   onShareTimeline() {
-    const lit = this.countLit()
     const scopeName = state.scope.level === 'province'
       ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '')
       : ''
-    const title = scopeName ? `${scopeName}已点亮 ${lit} 个市` : `我已经点亮了 ${lit} 个旅行地区`
+    const title = scopeName ? scopeName + '打卡地图' : '我的旅行地图'
     return {
       title,
       query: '',
