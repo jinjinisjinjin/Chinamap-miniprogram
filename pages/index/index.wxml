@@ -26,7 +26,7 @@
       class="map-canvas"
       bindtap="onMapTap"
     ></canvas>
-    <text class="map-brand">{{scopeLevel === 'province' ? scopeProvinceName : '足迹中国'}}</text>
+    <text class="map-brand" wx:if="{{scopeLevel === 'province'}}">{{scopeProvinceName}}</text>
   </view>
 
   <!-- 当前地区 -->
