@@ -31,6 +31,18 @@
   box-shadow: 0 6rpx 18rpx rgba(55, 44, 30, 0.10);
 }
 
+.back-btn {
+  font-family: "STKaiti", "KaiTi", serif;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1e2b25;
+  padding: 8rpx 18rpx;
+  border: 1rpx solid #d9d2c6;
+  border-radius: 14rpx;
+  background: rgba(255, 255, 255, 0.7);
+  align-self: center;
+}
+
 .counter-num {
   font-size: 40rpx;
   font-weight: 700;
@@ -223,6 +235,18 @@
   margin-bottom: 16rpx;
   font-size: 22rpx;
   color: #a8aaa5;
+}
+
+.enter-province-btn {
+  margin: 4rpx 0 16rpx;
+  padding: 14rpx 20rpx;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #fff;
+  background: #c46d3d;
+  border-radius: 14rpx;
+  box-shadow: 0 6rpx 16rpx rgba(196, 109, 61, 0.28);
 }
 
 /* ===== 上传按钮 ===== */

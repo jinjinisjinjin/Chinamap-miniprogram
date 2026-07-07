@@ -1,8 +1,10 @@
 const { tracePath, splitPath, getPathBounds } = require('../../utils/svg-path.js')
 const { regions, boundaryPath } = require('../../utils/map-data.js')
+const geo = require('../../utils/geo.js')
 
 /* ===== 常量 ===== */
 const MAP_VIEWBOX = 1200
+const NORM_VIEWBOX = 1000
 const POSTER_W = 1440
 const POSTER_H = 1920
 const DISPLAY_FONT = '"STKaiti", "KaiTi", serif'
@@ -35,6 +37,8 @@ const state = {
   photos: new Map(),
   profile: { avatar: '', nickname: '', avatarImg: null },
   provinces: (regions && regions.length > 0) ? regions : [],
+  scope: { level: 'country', provinceId: '' },
+  provinceRegionsCache: {},
 }
 
 // 画布引用
@@ -195,7 +199,6 @@ function getHKMacauInsetData() {
 Page({
   data: {
     litCount: 0,
-    totalProvinces: 0,
     activeName: '',
     uploadLabel: '上传照片',
     templateName: '极简白底',
@@ -216,8 +219,13 @@ Page({
     posterModalOpen: false,
     privacyVisible: false,
     privacyContractName: '《隐私保护指引》',
-    provinceNames: [],
-    provinceIndex: 0,
+    regionNames: [],
+    regionIndex: 0,
+    scopeLevel: 'country',
+    scopeProvinceName: '',
+    showBack: false,
+    canEnterProvince: false,
+    totalRegions: 0,
   },
 
   onLoad() {
@@ -229,17 +237,22 @@ Page({
     state.activeId = guangdong ? guangdong.id : (provinces[0] ? provinces[0].id : '')
     const defaultIndex = guangdong ? provinces.indexOf(guangdong) : 0
     this.setData({
-      totalProvinces: provinces.length,
+      totalRegions: provinces.length,
       canGenerate: provinces.length > 0,
       // 下拉选择器：省份名数组 + 当前选中下标，下标与 state.provinces 一一对应，保证地名↔位置映射准确
-      provinceNames: provinces.map(p => p.name),
-      provinceIndex: defaultIndex,
+      regionNames: provinces.map(p => p.name),
+      regionIndex: defaultIndex,
+      scopeLevel: 'country',
+      scopeProvinceName: '',
+      showBack: false,
+      canEnterProvince: false,
       nickname: state.profile.nickname || '',
       avatarUrl: state.profile.avatar || '',
       hasAvatar: !!state.profile.avatar,
       currentTemplate: state.template,
       templateName: templates[state.template].name,
     })
+    this.syncPanel()
     this.initPrivacy()
   },
 
@@ -392,6 +405,39 @@ Page({
     })
   },
 
+  /* ===== 层级（全国 / 省内）===== */
+  // 返回当前要绘制的"地图源"：全国层用 regions，省内层用该市数组
+  getMapContext() {
+    if (state.scope.level === 'province' && state.scope.provinceId) {
+      const regs = state.provinceRegionsCache[state.scope.provinceId]
+      if (regs) {
+        return { regions: regs, viewbox: NORM_VIEWBOX, showBoundary: false, showInsets: false }
+      }
+    }
+    return { regions: state.provinces, viewbox: MAP_VIEWBOX, showBoundary: true, showInsets: true }
+  },
+
+  // 某 region 在当前层级下的照片 key
+  photoKeyOf(region) {
+    if (state.scope.level === 'province') return state.scope.provinceId + ':' + region.id
+    return region.id
+  },
+
+  // 当前选中单元（省 or 市）的照片 key
+  currentPhotoKey() {
+    if (!state.activeId) return ''
+    if (state.scope.level === 'province') return state.scope.provinceId + ':' + state.activeId
+    return state.activeId
+  },
+
+  // 当前层级已点亮数量
+  countLit() {
+    const mc = this.getMapContext()
+    let n = 0
+    mc.regions.forEach((r) => { if (state.photos.has(this.photoKeyOf(r))) n++ })
+    return n
+  },
+
   /* ===== 地图渲染 ===== */
   renderMap() {
     if (!mapCtx || !mapCanvas) return
@@ -416,16 +462,17 @@ Page({
   drawMap(ctx, area, posterImages, highlightId) {
     if (highlightId === undefined) highlightId = state.activeId
     const template = templates[state.template]
-    const scale = area.w / MAP_VIEWBOX
+    const mc = this.getMapContext()
+    const scale = area.w / mc.viewbox
 
     ctx.save()
     ctx.translate(area.x, area.y)
     ctx.scale(scale, scale)
 
-    /* --- 省份 --- */
-    state.provinces.forEach(province => {
-      const photo = state.photos.get(province.id)
-      const img = getPhotoImage(province.id, posterImages)
+    /* --- 省份 / 地市 --- */
+    mc.regions.forEach(province => {
+      const photo = state.photos.get(this.photoKeyOf(province))
+      const img = getPhotoImage(this.photoKeyOf(province), posterImages)
 
       ctx.save()
 
@@ -471,7 +518,7 @@ Page({
     })
 
     // 国界线
-    if (boundaryPath) {
+    if (mc.showBoundary && boundaryPath) {
       ctx.beginPath()
       tracePath(ctx, boundaryPath)
       ctx.strokeStyle = '#b7ad8b'
@@ -481,7 +528,7 @@ Page({
     }
 
     // 选中省份高亮描边
-    const active = state.provinces.find(p => p.id === highlightId)
+    const active = mc.regions.find(p => p.id === highlightId)
     if (active) {
       ctx.beginPath()
       tracePath(ctx, active.d)
@@ -491,9 +538,11 @@ Page({
       ctx.stroke()
     }
 
-    // 放大图
-    this.drawSouthSeaInset(ctx, template, posterImages, highlightId)
-    this.drawHongKongMacauInset(ctx, template, posterImages, highlightId)
+    // 放大图（仅全国层）
+    if (mc.showInsets) {
+      this.drawSouthSeaInset(ctx, template, posterImages, highlightId)
+      this.drawHongKongMacauInset(ctx, template, posterImages, highlightId)
+    }
 
     ctx.restore()
   },
@@ -626,7 +675,7 @@ Page({
 
   /* ===== 点击省份（命中检测） ===== */
   onMapTap(e) {
-    if (!mapCtx || state.provinces.length === 0) return
+    if (!mapCtx) return
     const tapX = e.detail.x
     const tapY = e.detail.y
 
@@ -637,45 +686,54 @@ Page({
       if (!rect) return
       const cssX = tapX - rect.left
       const cssY = tapY - rect.top
-      const province = this.hitTest(cssX, cssY)
-      if (province) {
-        this.selectProvince(province.id)
+      const region = this.hitTest(cssX, cssY)
+      if (!region) return
+      if (state.scope.level === 'country') {
+        // 全国层：点击有数据的省直接进入省内，否则仅选中
+        if (geo.hasProvinceGeo(region.id)) this.enterProvince(region.id)
+        else this.selectRegion(region.id)
+      } else {
+        // 省内层：点击市即选中
+        this.selectRegion(region.id)
       }
     })
   },
 
   hitTest(cssX, cssY) {
     const ctx = mapCtx
-    // 转换为 1200x1200 逻辑坐标
-    const lx = cssX * (MAP_VIEWBOX / mapDispW)
-    const ly = cssY * (MAP_VIEWBOX / mapDispH)
+    const viewbox = this.getMapContext().viewbox
+    // 转换为逻辑坐标
+    const lx = cssX * (viewbox / mapDispW)
+    const ly = cssY * (viewbox / mapDispH)
 
-    // 优先检查放大图区域
-    const ssData = getSouthSeaInsetData()
-    if (ssData) {
-      const frame = { x: 828, y: 842, w: 286, h: 250 }
-      if (lx >= frame.x && lx <= frame.x + frame.w && ly >= frame.y && ly <= frame.y + frame.h) {
-        return ssData.province
+    // 优先检查放大图区域（仅全国层）
+    if (this.getMapContext().showInsets) {
+      const ssData = getSouthSeaInsetData()
+      if (ssData) {
+        const frame = { x: 828, y: 842, w: 286, h: 250 }
+        if (lx >= frame.x && lx <= frame.x + frame.w && ly >= frame.y && ly <= frame.y + frame.h) {
+          return ssData.province
+        }
+      }
+      const hkData = getHKMacauInsetData()
+      if (hkData) {
+        const frame = { x: 932, y: 664, w: 182, h: 152 }
+        if (lx >= frame.x && lx <= frame.x + frame.w && ly >= frame.y && ly <= frame.y + frame.h) {
+          const mid = frame.x + frame.w / 2
+          return lx < mid ? hkData.regions[0] : hkData.regions[hkData.regions.length - 1]
+        }
       }
     }
-    const hkData = getHKMacauInsetData()
-    if (hkData) {
-      const frame = { x: 932, y: 664, w: 182, h: 152 }
-      if (lx >= frame.x && lx <= frame.x + frame.w && ly >= frame.y && ly <= frame.y + frame.h) {
-        // 简单按左右半区分
-        const mid = frame.x + frame.w / 2
-        return lx < mid ? hkData.regions[0] : hkData.regions[hkData.regions.length - 1]
-      }
-    }
 
-    // 检查主省份路径（从后往前，顶层优先）
+    // 检查主区域路径（从后往前，顶层优先）
     ctx.save()
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.scale(mapDpr, mapDpr)
-    ctx.scale(mapDispW / MAP_VIEWBOX, mapDispH / MAP_VIEWBOX)
+    ctx.scale(mapDispW / viewbox, mapDispH / viewbox)
 
-    for (let i = state.provinces.length - 1; i >= 0; i--) {
-      const province = state.provinces[i]
+    const regions = this.getMapContext().regions
+    for (let i = regions.length - 1; i >= 0; i--) {
+      const province = regions[i]
       // 快速 bbox 过滤
       const [bx, by, bw, bh] = province.bbox
       if (lx < bx - 5 || lx > bx + bw + 5 || ly < by - 5 || ly > by + bh + 5) continue
@@ -699,34 +757,94 @@ Page({
     return null
   },
 
-  /* ===== 选择省份 ===== */
-  selectProvince(id) {
+  /* ===== 选择区域（省 / 市通用） ===== */
+  selectRegion(id) {
     state.activeId = id
-    // 同步下拉选择器索引，保证地图高亮与下拉显示一致（无论是下拉选还是点击地图）
-    const idx = state.provinces.findIndex(p => p.id === id)
-    if (idx >= 0) this.setData({ provinceIndex: idx })
+    const mc = this.getMapContext()
+    const idx = mc.regions.findIndex(r => r.id === id)
+    if (idx >= 0) this.setData({ regionIndex: idx })
     this.renderMap()
     this.syncPanel()
   },
 
-  /* ===== 下拉选择省份 ===== */
-  onProvincePickerChange(e) {
+  /* ===== 进入省内（显示该省地级市地图） ===== */
+  enterProvince(provinceId) {
+    const regs = geo.getProvinceRegions(provinceId, state.provinceRegionsCache)
+    if (!regs || regs.length === 0) {
+      this.selectRegion(provinceId)
+      return
+    }
+    state.scope = { level: 'province', provinceId }
+    const prov = state.provinces.find(p => p.id === provinceId)
+    state.activeId = regs[0] ? regs[0].id : ''
+    this.setData({
+      scopeLevel: 'province',
+      scopeProvinceName: prov ? prov.name : '',
+      regionNames: regs.map(r => r.name),
+      regionIndex: 0,
+      showBack: true,
+      canEnterProvince: false,
+    })
+    this.renderMap()
+    this.syncPanel()
+  },
+
+  /* ===== 返回全国层 ===== */
+  exitProvince() {
+    const backId = state.scope.provinceId
+    state.scope = { level: 'country', provinceId: '' }
+    state.activeId = backId || (state.provinces[0] ? state.provinces[0].id : '')
+    const idx = state.provinces.findIndex(p => p.id === state.activeId)
+    this.setData({
+      scopeLevel: 'country',
+      scopeProvinceName: '',
+      regionNames: state.provinces.map(p => p.name),
+      regionIndex: Math.max(0, idx),
+      showBack: false,
+    })
+    this.renderMap()
+    this.syncPanel()
+  },
+
+  /* ===== 进入当前选中的省（省内玩法入口） ===== */
+  onEnterCurrentProvince() {
+    if (state.scope.level === 'country' && state.activeId && geo.hasProvinceGeo(state.activeId)) {
+      this.enterProvince(state.activeId)
+    }
+  },
+
+  /* ===== 下拉选择（省 / 市） ===== */
+  onRegionPickerChange(e) {
     const idx = Number(e.detail.value)
-    const province = state.provinces[idx]
-    if (!province) return
-    this.selectProvince(province.id)
+    const mc = this.getMapContext()
+    const region = mc.regions[idx]
+    if (!region) return
+    if (state.scope.level === 'country') {
+      if (geo.hasProvinceGeo(region.id)) this.enterProvince(region.id)
+      else this.selectRegion(region.id)
+    } else {
+      this.selectRegion(region.id)
+    }
   },
 
   syncPanel() {
-    const province = state.provinces.find(p => p.id === state.activeId)
-    const photo = province ? state.photos.get(state.activeId) : null
+    const mc = this.getMapContext()
+    const region = mc.regions.find(r => r.id === state.activeId)
+    const photo = region ? state.photos.get(this.photoKeyOf(region)) : null
     const patch = {
-      activeName: province ? province.name : '待加载',
+      activeName: region ? region.name : '待加载',
       uploadLabel: photo ? '更换照片' : '上传照片',
-      litCount: state.photos.size,
-      canUpload: !!province,
+      litCount: this.countLit(),
+      totalRegions: mc.regions.length,
+      canUpload: !!region,
       hasActivePhoto: !!photo,
       templateName: templates[state.template].name,
+      canEnterProvince: state.scope.level === 'country' && region && geo.hasProvinceGeo(region.id),
+    }
+    if (state.scope.level === 'province') {
+      const prov = state.provinces.find(p => p.id === state.scope.provinceId)
+      patch.activeName = (prov ? prov.name : '') + ' · ' + (region ? region.name : '')
+      patch.canEnterProvince = false
     }
     if (photo) {
       patch.scaleValue = Math.round(photo.scale * 100)
@@ -742,17 +860,20 @@ Page({
 
   /* ===== 删除当前区域照片 ===== */
   onDeleteCurrentPhoto() {
-    if (!state.activeId) return
-    if (!state.photos.has(state.activeId)) return
-    const name = (state.provinces.find(p => p.id === state.activeId) || {}).name || '该地区'
+    const key = this.currentPhotoKey()
+    if (!key) return
+    if (!state.photos.has(key)) return
+    const mc = this.getMapContext()
+    const region = mc.regions.find(r => r.id === state.activeId)
+    const name = region ? region.name : '该地区'
     wx.showModal({
       title: '删除照片',
       content: `确定删除「${name}」的照片吗？`,
       success: (res) => {
         if (res.confirm) {
-          const photo = state.photos.get(state.activeId)
+          const photo = state.photos.get(key)
           if (photo && isPersistPath(photo.src)) removeFileSafe(photo.src)
-          state.photos.delete(state.activeId)
+          state.photos.delete(key)
           this.renderMap()
           this.syncPanel()
           this.saveState()
@@ -763,20 +884,22 @@ Page({
 
   /* ===== 去过的地方（海报展示） ===== */
   getVisitedText() {
+    const mc = this.getMapContext()
     const names = []
-    state.provinces.forEach(p => {
-      if (state.photos.has(p.id)) names.push(p.name)
-    })
+    mc.regions.forEach(r => { if (state.photos.has(this.photoKeyOf(r))) names.push(r.name) })
     const n = names.length
-    if (n === 0) return '还没有点亮任何地方'
-    if (n <= 6) return '去过 ' + names.join(' · ')
-    return '去过 ' + names.slice(0, 6).join(' · ') + ' 等 ' + n + ' 个地方'
+    const prefix = state.scope.level === 'province'
+      ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '') + '的 '
+      : ''
+    if (n === 0) return '还没有点亮' + prefix + '任何地方'
+    if (n <= 6) return '去过 ' + prefix + names.join(' · ')
+    return '去过 ' + prefix + names.slice(0, 6).join(' · ') + ' 等 ' + n + ' 个地方'
   },
 
   /* ===== 照片上传 ===== */
   onUploadPhoto() {
     if (!state.activeId) {
-      wx.showToast({ title: '请先选择省份', icon: 'none' })
+      wx.showToast({ title: '请先选择地区', icon: 'none' })
       return
     }
     if (!mapCanvas) {
@@ -796,13 +919,14 @@ Page({
       sizeType: this.data.useOriginal ? ['original'] : ['compressed'],
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
-        const old = state.photos.get(state.activeId)
+        const key = this.currentPhotoKey()
+        const old = state.photos.get(key)
         const oldSrc = old ? old.src : ''
-        persistTempFile(tempPath, state.activeId).then((persistPath) => {
+        persistTempFile(tempPath, key).then((persistPath) => {
           if (isPersistPath(oldSrc)) removeFileSafe(oldSrc)  // 替换旧图，清理原文件
           const img = mapCanvas.createImage()
           img.onload = () => {
-            state.photos.set(state.activeId, {
+            state.photos.set(key, {
               src: persistPath,
               image: img,
               scale: 1.16,
@@ -885,7 +1009,7 @@ Page({
 
   /* ===== 照片调整 ===== */
   setActivePhotoValue(key, value) {
-    const photo = state.photos.get(state.activeId)
+    const photo = state.photos.get(this.currentPhotoKey())
     if (!photo) return
     photo[key] = value
     this.renderMap()
@@ -943,13 +1067,26 @@ Page({
 
   /* ===== 清空 ===== */
   onClear() {
+    const mc = this.getMapContext()
+    const keys = []
+    mc.regions.forEach(r => { const k = this.photoKeyOf(r); if (state.photos.has(k)) keys.push(k) })
+    if (keys.length === 0) {
+      wx.showToast({ title: '暂无照片可清空', icon: 'none' })
+      return
+    }
+    const clearAll = state.scope.level !== 'province'
     wx.showModal({
       title: '确认清空',
-      content: '将清空所有已上传的省份照片，确定继续吗？',
+      content: clearAll
+        ? '将清空所有已上传的省份照片，确定继续吗？'
+        : `将清空「${(state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || ''}」下所有已上传的照片，确定继续吗？`,
       success: (res) => {
         if (res.confirm) {
-          state.photos.forEach((photo) => { if (photo.src && isPersistPath(photo.src)) removeFileSafe(photo.src) })
-          state.photos.clear()
+          keys.forEach(k => {
+            const photo = state.photos.get(k)
+            if (photo && photo.src && isPersistPath(photo.src)) removeFileSafe(photo.src)
+            state.photos.delete(k)
+          })
           this.renderMap()
           this.syncPanel()
           this.setData({ hasPoster: false, posterUrl: '' })
@@ -1008,6 +1145,7 @@ Page({
   drawPoster(posterImages, avatarImg) {
     const ctx = posterCtx
     const template = templates[state.template]
+    const mc = this.getMapContext()
 
     // 纸张底色
     ctx.fillStyle = template.paper
@@ -1024,12 +1162,18 @@ Page({
     ctx.font = `700 98px ${DISPLAY_FONT}`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
-    ctx.fillText('我的旅行地图', 130, 180)
+    const titleText = state.scope.level === 'province'
+      ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '浙江') + '打卡'
+      : '我的旅行地图'
+    ctx.fillText(titleText, 130, 180)
 
     // 统计
     ctx.fillStyle = template.accent
     ctx.font = `700 35px ${TEXT_FONT}`
-    ctx.fillText(`已点亮 ${state.photos.size} / ${state.provinces.length} 个地区`, 134, 244)
+    const statText = state.scope.level === 'province'
+      ? `已点亮 ${this.countLit()} / ${mc.regions.length} 个市`
+      : `已点亮 ${this.countLit()} / ${mc.regions.length} 个地区`
+    ctx.fillText(statText, 134, 244)
 
     // 头像 + 昵称
     const nickname = state.profile.nickname
@@ -1074,13 +1218,13 @@ Page({
     // 地图轮廓投影：沿中国地图整体轮廓生成柔和悬浮阴影（非方框）
     ctx.save()
     ctx.translate(0, 250)
-    ctx.scale(POSTER_W / MAP_VIEWBOX, POSTER_W / MAP_VIEWBOX)
+    ctx.scale(POSTER_W / mc.viewbox, POSTER_W / mc.viewbox)
     ctx.shadowColor = 'rgba(54, 45, 30, 0.22)'
     ctx.shadowBlur = 30
     ctx.shadowOffsetX = 0
     ctx.shadowOffsetY = 16
     ctx.beginPath()
-    state.provinces.forEach(province => tracePath(ctx, province.d))
+    mc.regions.forEach(r => tracePath(ctx, r.d))
     ctx.fillStyle = template.paper
     ctx.fill()
     ctx.restore()
@@ -1129,20 +1273,29 @@ Page({
 
   /* ===== 分享（转发好友 / 朋友圈） ===== */
   onShareAppMessage() {
-    const lit = state.photos.size
+    const lit = this.countLit()
+    const scopeName = state.scope.level === 'province'
+      ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '')
+      : ''
     const hasPoster = !!this.data.posterUrl
+    const title = scopeName
+      ? `${scopeName}已点亮 ${lit} 个市`
+      : `我的旅行地图，已点亮 ${lit} 个地区`
     return {
-      title: hasPoster
-        ? `我的旅行地图，已点亮 ${lit} 个地区`
-        : `我已经点亮了 ${lit} 个旅行地区，来看看吧`,
+      title: hasPoster ? title : `我已经点亮了 ${lit} 个旅行地区，来看看吧`,
       path: '/pages/index/index',
       imageUrl: this.data.posterUrl || ''
     }
   },
 
   onShareTimeline() {
+    const lit = this.countLit()
+    const scopeName = state.scope.level === 'province'
+      ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '')
+      : ''
+    const title = scopeName ? `${scopeName}已点亮 ${lit} 个市` : `我已经点亮了 ${lit} 个旅行地区`
     return {
-      title: `我已经点亮了 ${state.photos.size} 个旅行地区`,
+      title,
       query: '',
       imageUrl: this.data.posterUrl || ''
     }

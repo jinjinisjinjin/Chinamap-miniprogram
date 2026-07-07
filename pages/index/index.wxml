@@ -1,10 +1,11 @@
 <view class="app">
   <!-- 顶栏 -->
   <view class="header">
+    <view wx:if="{{showBack}}" class="back-btn" bindtap="onExitProvince">‹ 返回</view>
     <text class="title">我的旅行地图</text>
     <view class="counter">
       <text class="counter-num">{{litCount}}</text>
-      <text class="counter-total">/ {{totalProvinces}}</text>
+      <text class="counter-total">/ {{totalRegions}}</text>
     </view>
   </view>
 
@@ -16,19 +17,19 @@
       class="map-canvas"
       bindtap="onMapTap"
     ></canvas>
-    <text class="map-brand">足迹中国</text>
+    <text class="map-brand">{{scopeLevel === 'province' ? scopeProvinceName : '足迹中国'}}</text>
   </view>
 
   <!-- 当前地区 -->
   <view class="panel">
     <view class="panel-head">
-      <text class="panel-label">当前地区</text>
+      <text class="panel-label">{{scopeLevel === 'province' ? '当前城市' : '当前地区'}}</text>
       <picker
         class="region-picker"
         mode="selector"
-        range="{{provinceNames}}"
-        value="{{provinceIndex}}"
-        bindchange="onProvincePickerChange"
+        range="{{regionNames}}"
+        value="{{regionIndex}}"
+        bindchange="onRegionPickerChange"
       >
         <view class="picker-display">
           <text class="picker-text">{{activeName}}</text>
@@ -36,7 +37,9 @@
         </view>
       </picker>
     </view>
-    <view class="region-hint">点击地区名，从下拉列表选择省份 →</view>
+    <view class="region-hint" wx:if="{{scopeLevel === 'country'}}">点击地图省份或下拉选择，可进入省内看地级市 →</view>
+    <view class="region-hint" wx:if="{{scopeLevel === 'province'}}">点击地图城市或下拉选择，上传该城市照片</view>
+    <view wx:if="{{canEnterProvince}}" class="enter-province-btn" bindtap="onEnterCurrentProvince">进入「{{activeName}}」看地级市 →</view>
     <view class="upload-btn {{!canUpload ? 'btn-disabled' : ''}}" bindtap="onUploadPhoto">
       <text class="upload-icon">+</text>
       <text>{{uploadLabel}}</text>
