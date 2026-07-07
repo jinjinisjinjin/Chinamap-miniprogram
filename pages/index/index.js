@@ -170,9 +170,9 @@ function getSouthSeaInsetData() {
   return {
     province, islands,
     bounds: {
-      x: Math.min(...xs), y: Math.min(...ys),
-      width: Math.max(...x2s) - Math.min(...xs),
-      height: Math.max(...y2s) - Math.min(...ys)
+      x: Math.min.apply(null, xs), y: Math.min.apply(null, ys),
+      width: Math.max.apply(null, x2s) - Math.min.apply(null, xs),
+      height: Math.max.apply(null, y2s) - Math.min.apply(null, ys)
     }
   }
 }
@@ -188,9 +188,9 @@ function getHKMacauInsetData() {
   return {
     regions,
     bounds: {
-      x: Math.min(...xs), y: Math.min(...ys),
-      width: Math.max(...x2s) - Math.min(...xs),
-      height: Math.max(...y2s) - Math.min(...ys)
+      x: Math.min.apply(null, xs), y: Math.min.apply(null, ys),
+      width: Math.max.apply(null, x2s) - Math.min.apply(null, xs),
+      height: Math.max.apply(null, y2s) - Math.min.apply(null, ys)
     }
   }
 }
