@@ -803,9 +803,6 @@ Page({
     const crumbs = []
     if (state.scope.level === 'country') {
       crumbs.push({ id: 'country', name: '全国', action: 'none', active: true })
-      state.provinces.forEach((p) => {
-        if (geo.hasProvinceGeo(p.id)) crumbs.push({ id: p.id, name: p.name, action: 'enter', active: false })
-      })
     } else {
       crumbs.push({ id: 'country', name: '全国', action: 'back', active: false })
       const prov = state.provinces.find(p => p.id === state.scope.provinceId)
@@ -831,8 +828,13 @@ Page({
     const mc = this.getMapContext()
     const region = mc.regions[idx]
     if (!region) return
-    // 下拉只做"选中高亮"，进省由顶层导航栏触发
-    this.selectRegion(region.id)
+    // 全国层：下拉选择省份即进入该省（省内玩法）；省内层：仅选中城市
+    if (state.scope.level === 'country') {
+      if (geo.hasProvinceGeo(region.id)) this.enterProvince(region.id)
+      else this.selectRegion(region.id)
+    } else {
+      this.selectRegion(region.id)
+    }
   },
 
   syncPanel() {

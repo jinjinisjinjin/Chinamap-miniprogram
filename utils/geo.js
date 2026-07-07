@@ -10,9 +10,45 @@
 
 const NORM_VIEWBOX = 1000
 
-// 省级行政区数据源（按需添加，初期仅浙江）。key = 全国 provinces 的 id（即 adcode）
+// 省级行政区数据源（34 个省级行政区全部接入）。key = 全国 provinces 的 id（即 adcode）
+// 注意：所有数据文件必须是 .js 模块（module.exports = GeoJSON）；小程序 require 不支持加载 .json
+// 数据来自阿里云 DataV GeoAtlas 的 {adcode}_full.json（地级市/直辖市辖区/特区分区边界）
+// 例外：台湾省(710000) DataV 仅提供省级轮廓（无市县细分），故目前只有 1 个区域（省级轮廓）
 const GEO_SOURCES = {
-  '330000': require('./geo/zhejiang.js'), // 浙江（须用 .js 模块；小程序 require 不支持加载 .json）
+  '110000': require('./geo/110000.js'), // 北京
+  '120000': require('./geo/120000.js'), // 天津
+  '130000': require('./geo/130000.js'), // 河北
+  '140000': require('./geo/140000.js'), // 山西
+  '150000': require('./geo/150000.js'), // 内蒙古
+  '210000': require('./geo/210000.js'), // 辽宁
+  '220000': require('./geo/220000.js'), // 吉林
+  '230000': require('./geo/230000.js'), // 黑龙江
+  '310000': require('./geo/310000.js'), // 上海
+  '320000': require('./geo/320000.js'), // 江苏
+  '330000': require('./geo/330000.js'), // 浙江
+  '340000': require('./geo/340000.js'), // 安徽
+  '350000': require('./geo/350000.js'), // 福建
+  '360000': require('./geo/360000.js'), // 江西
+  '370000': require('./geo/370000.js'), // 山东
+  '410000': require('./geo/410000.js'), // 河南
+  '420000': require('./geo/420000.js'), // 湖北
+  '430000': require('./geo/430000.js'), // 湖南
+  '440000': require('./geo/440000.js'), // 广东
+  '450000': require('./geo/450000.js'), // 广西
+  '460000': require('./geo/460000.js'), // 海南
+  '500000': require('./geo/500000.js'), // 重庆
+  '510000': require('./geo/510000.js'), // 四川
+  '520000': require('./geo/520000.js'), // 贵州
+  '530000': require('./geo/530000.js'), // 云南
+  '540000': require('./geo/540000.js'), // 西藏
+  '610000': require('./geo/610000.js'), // 陕西
+  '620000': require('./geo/620000.js'), // 甘肃
+  '630000': require('./geo/630000.js'), // 青海
+  '640000': require('./geo/640000.js'), // 宁夏
+  '650000': require('./geo/650000.js'), // 新疆
+  '710000': require('./geo/710000.js'), // 台湾（仅省级轮廓）
+  '810000': require('./geo/810000.js'), // 香港
+  '820000': require('./geo/820000.js'), // 澳门
 }
 
 // 将单个 [lon, lat] 归一化到 NORM_VIEWBOX

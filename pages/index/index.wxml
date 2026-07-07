@@ -46,7 +46,7 @@
         </view>
       </picker>
     </view>
-    <view class="region-hint" wx:if="{{scopeLevel === 'country'}}">顶部导航点「浙江」进入省内看地级市；橙色描边的省已开通省内打卡</view>
+    <view class="region-hint" wx:if="{{scopeLevel === 'country'}}">下拉选择省份，即可进入省内看地级市 →</view>
     <view class="region-hint" wx:if="{{scopeLevel === 'province'}}">点击地图城市或下拉选择，上传该城市照片</view>
     <view class="upload-btn {{!canUpload ? 'btn-disabled' : ''}}" bindtap="onUploadPhoto">
       <text class="upload-icon">+</text>
