@@ -97,6 +97,7 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
     visible[visible.length - 1] = last + '...'
   }
   visible.forEach((l, i) => ctx.fillText(l, x, y + i * lineHeight))
+  return visible.length
 }
 
 function trimTextToWidth(ctx, text, maxWidth) {
@@ -526,6 +527,28 @@ Page({
     return regions.filter((_, i) => islandIdx.has(i))
   },
 
+  /* 计算地图渲染变换与"主区域/离岛"划分。
+   * drawMap 主视图与海报投影阴影共用，确保两者变换一致（省内 fit 居中）、
+   * 且阴影只覆盖"主陆地"，不含离岛/飞地（海南·三沙市、台湾·金門等）的跨海轮廓，
+   * 避免出现与主图错位的"旧轮廓"残影。 */
+  getMapRenderPlan(area, mc, isProvince) {
+    let insetRegions = []
+    let mainRegions = mc.regions
+    let scale = area.w / mc.viewbox
+    let tx = area.x
+    let ty = area.y
+    if (isProvince && mc.viewbox === NORM_VIEWBOX) {
+      insetRegions = this.getProvinceIslands(mc.regions)
+      mainRegions = mc.regions.filter(r => insetRegions.indexOf(r) < 0)
+      const cb = this.computeContentBounds(mainRegions)
+      const fit = 0.94
+      scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
+      tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
+      ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
+    }
+    return { tx, ty, scale, mainRegions, insetRegions }
+  },
+
   drawMap(ctx, area, posterImages, highlightId) {
     if (highlightId === undefined) highlightId = state.activeId
     const template = templates[state.template]
@@ -540,17 +563,14 @@ Page({
     let tx = area.x
     let ty = area.y
     const insetSide = state.scope.provinceId === '710000' ? 'right' : 'right'
-    const insetTitleAbove = state.scope.provinceId === '710000'
+    const insetTitleAbove = state.scope.provinceId === '710000' // 台湾离岛文字在框正上方居中；海南在框内
 
-    if (isProvince && mc.viewbox === NORM_VIEWBOX) {
-      insetRegions = this.getProvinceIslands(mc.regions)
-      mainRegions = mc.regions.filter(r => insetRegions.indexOf(r) < 0)
-      const cb = this.computeContentBounds(mainRegions)
-      const fit = 0.94
-      scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
-      tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
-      ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
-    }
+    const plan = this.getMapRenderPlan(area, mc, isProvince)
+    insetRegions = plan.insetRegions
+    mainRegions = plan.mainRegions
+    scale = plan.scale
+    tx = plan.tx
+    ty = plan.ty
 
     // 记录当前变换矩阵，供点击命中检测使用（同时修复省内视图点击偏移）
     this._mapXF = { tx, ty, scale, viewbox: mc.viewbox, isProvince }
@@ -578,7 +598,7 @@ Page({
         const size = base * ps
         const ix = bx + bw / 2 - size / 2 + (photo ? photo.x : 0)
         const iy = by + bh / 2 - size / 2 + (photo ? photo.y : 0)
-        ctx.drawImage(img, ix, iy, size, size)
+        drawCoverImage(ctx, img, ix, iy, size, size)
       }
 
       // 省份路径
@@ -589,11 +609,11 @@ Page({
       // 描边：省内视图用"填充同色 bleed + 柔和 seam 色"让拼图严丝合缝（不再用刺眼白边）；全国视图保持原白边
       if (isProvince) {
         ctx.strokeStyle = template.empty
-        ctx.lineWidth = 2.2
+        ctx.lineWidth = 0.3
         ctx.lineJoin = 'round'
         ctx.stroke()
         ctx.strokeStyle = province.id === highlightId ? template.active : template.seam
-        ctx.lineWidth = province.id === highlightId ? 2.2 : 1
+        ctx.lineWidth = province.id === highlightId ? 0.35 : 0.15
         ctx.lineJoin = 'round'
         ctx.stroke()
       } else {
@@ -738,7 +758,7 @@ Page({
     ctx.fillStyle = 'rgba(255, 250, 241, 0.9)'
     ctx.fill()
     ctx.strokeStyle = 'rgba(135, 119, 93, 0.44)'
-    ctx.lineWidth = 1.4
+    ctx.lineWidth = 1.0
     ctx.stroke()
 
     ctx.fillStyle = '#5d675f'
@@ -804,18 +824,18 @@ Page({
 
     // 卡片尺寸（屏幕/area 坐标，悬浮于左下或右下）
     const margin = 12
-    const frameW = Math.min(area.w * 0.34, 250)
-    const frameH = frameW * 0.78
+    const frameW = Math.min(area.w * 0.28, 200)
+    const frameH = frameW * 0.7
     const fx = side === 'left' ? area.x + margin : area.x + area.w - frameW - margin
     const fy = area.y + area.h - frameH - margin
 
-    // 内区（标题下方；titleAbove 时标题在方框外，内区占满整张卡）
-    const pad = 14
-    const titleH = titleAbove ? 0 : 26
+    // 内区（台湾标题在框上方，内区占满整框；海南标题在框内顶部）
+    const pad = 20
+    const titleH = titleAbove ? 0 : 28
     const innerX = fx + pad
-    const innerTop = fy + titleH + (titleAbove ? 4 : 0)
+    const innerTop = fy + titleH
     const innerW = frameW - pad * 2
-    const innerH = frameH - titleH - pad - (titleAbove ? 4 : 0)
+    const innerH = frameH - titleH - pad
 
     const s = Math.min(innerW / bw, innerH / bh) * 0.96
     const cw = bw * s, ch = bh * s
@@ -830,31 +850,24 @@ Page({
     }
 
     ctx.save()
-    // 悬浮卡片阴影
-    ctx.shadowColor = 'rgba(54, 45, 30, 0.22)'
-    ctx.shadowBlur = 20
-    ctx.shadowOffsetX = 0
-    ctx.shadowOffsetY = 8
-    roundRect(ctx, fx, fy, frameW, frameH, 16)
-    ctx.fillStyle = 'rgba(255, 250, 241, 0.95)'
+    // 卡片框（与全国地图南海诸岛风格一致）
+    roundRect(ctx, fx, fy, frameW, frameH, 8)
+    ctx.fillStyle = 'rgba(255, 250, 241, 0.88)'
     ctx.fill()
-    // 关闭阴影再描边，避免阴影被边框叠加
-    ctx.shadowColor = 'transparent'
-    ctx.shadowBlur = 0
-    ctx.shadowOffsetY = 0
-    ctx.strokeStyle = 'rgba(135, 119, 93, 0.42)'
-    ctx.lineWidth = 1.4
+    ctx.strokeStyle = 'rgba(135, 119, 93, 0.44)'
+    ctx.lineWidth = 1.0
     ctx.stroke()
 
-    // 标题（金門·澎湖·馬祖 等；台湾放在方框"上方"，其余放在方框内顶部）
+    // 标题（台湾：框正上方居中、字号更小；海南：框内顶部）
     ctx.fillStyle = '#5d675f'
-    ctx.font = `800 15px ${TEXT_FONT}`
-    ctx.textAlign = 'left'
+    ctx.font = `800 ${titleAbove ? 10 : 11}px ${TEXT_FONT}`
     ctx.textBaseline = 'alphabetic'
     if (titleAbove) {
-      ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 2, fy - 8)
+      ctx.textAlign = 'center'
+      ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + frameW / 2, fy - 7)
     } else {
-      ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 14, fy + 19)
+      ctx.textAlign = 'left'
+      ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 14, fy + 20)
     }
 
     // 离岛路径
@@ -883,7 +896,7 @@ Page({
       ctx.fillStyle = img ? 'transparent' : template.empty
       ctx.fill()
       ctx.strokeStyle = region.id === highlightId ? template.active : '#d8cdb9'
-      ctx.lineWidth = 1.8 / s
+      ctx.lineWidth = 1.55 / s
       ctx.lineJoin = 'round'
       ctx.stroke()
       ctx.restore()
@@ -893,23 +906,35 @@ Page({
   },
 
   /* ===== 点击省份（命中检测） ===== */
-  onMapTap(e) {
-    if (!mapCtx) return
-    const tapX = e.detail.x
-    const tapY = e.detail.y
+  // 用 canvas 的 touch 事件拿"相对画布"坐标（不受页面滚动影响），
+  // 并用位移阈值区分"点击"与"滚动"，避免滑动页面时误选。
+  onMapTouchStart(e) {
+    const t = e.touches && e.touches[0]
+    if (!t) { this._tapStart = null; return }
+    this._tapStart = { x: t.x, y: t.y, moved: false }
+  },
 
-    const query = wx.createSelectorQuery()
-    query.select('#mapCanvas').boundingClientRect()
-    query.exec((res) => {
-      const rect = res[0]
-      if (!rect) return
-      const cssX = tapX - rect.left
-      const cssY = tapY - rect.top
-      const region = this.hitTest(cssX, cssY)
-      if (!region) return
-      // 顶层导航栏是唯一进省入口（点地图/下拉只做"选中高亮"，不自动进省）
-      this.selectRegion(region.id)
-    })
+  onMapTouchMove(e) {
+    const s = this._tapStart
+    if (!s) return
+    const t = e.touches && e.touches[0]
+    if (!t) return
+    const dx = t.x - s.x
+    const dy = t.y - s.y
+    if (dx * dx + dy * dy > 100) s.moved = true // 位移 >10px 视为滚动
+  },
+
+  onMapTap(e) {
+    const s = this._tapStart
+    this._tapStart = null
+    if (!s || s.moved) return // 滚动手势不触发选中
+    if (!mapCtx) return
+    const t = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0])
+    if (!t) return
+    const region = this.hitTest(t.x, t.y)
+    if (!region) return
+    // 顶层导航栏是唯一进省入口（点地图/下拉只做"选中高亮"，不自动进省）
+    this.selectRegion(region.id)
   },
 
   hitTest(cssX, cssY) {
@@ -1138,8 +1163,7 @@ Page({
       ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '') + '的 '
       : ''
     if (n === 0) return '还没有点亮' + prefix + '任何地方'
-    if (n <= 6) return '去过 ' + prefix + names.join(' · ')
-    return '去过 ' + prefix + names.slice(0, 6).join(' · ') + ' …'
+    return '去过 ' + prefix + names.join(' · ')
   },
 
   /* ===== 照片上传 ===== */
@@ -1165,29 +1189,8 @@ Page({
       sizeType: this.data.useOriginal ? ['original'] : ['compressed'],
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
-        const key = this.currentPhotoKey()
-        const old = state.photos.get(key)
-        const oldSrc = old ? old.src : ''
-        persistTempFile(tempPath, key).then((persistPath) => {
-          if (isPersistPath(oldSrc)) removeFileSafe(oldSrc)  // 替换旧图，清理原文件
-          const img = mapCanvas.createImage()
-          img.onload = () => {
-            state.photos.set(key, {
-              src: persistPath,
-              image: img,
-              scale: 1.16,
-              x: 0,
-              y: 0
-            })
-            this.renderMap()
-            this.syncPanel()
-            this.saveState()
-          }
-          img.onerror = () => {
-            wx.showToast({ title: '图片加载失败', icon: 'none' })
-          }
-          img.src = persistPath
-        })
+        // 选图后引导用户裁剪为正方形，避免照片被拉伸变形
+        this.cropAndPersistPhoto(tempPath)
       },
       fail: (err) => {
         const msg = (err && err.errMsg) || ''
@@ -1196,6 +1199,52 @@ Page({
         wx.showToast({ title: msg || '选择失败', icon: 'none' })
       }
     })
+  },
+
+  /* 选图后裁剪为 1:1 正方形再保存；低端机型/旧基础库不支持裁剪时退回原图（canvas 端仍有 cover 兜底） */
+  cropAndPersistPhoto(tempPath) {
+    const persist = (src) => {
+      const key = this.currentPhotoKey()
+      const old = state.photos.get(key)
+      const oldSrc = old ? old.src : ''
+      persistTempFile(src, key).then((persistPath) => {
+        if (isPersistPath(oldSrc)) removeFileSafe(oldSrc)  // 替换旧图，清理原文件
+        const img = mapCanvas.createImage()
+        img.onload = () => {
+          state.photos.set(key, {
+            src: persistPath,
+            image: img,
+            scale: 1.16,
+            x: 0,
+            y: 0
+          })
+          this.renderMap()
+          this.syncPanel()
+          this.saveState()
+        }
+        img.onerror = () => {
+          wx.showToast({ title: '图片加载失败', icon: 'none' })
+        }
+        img.src = persistPath
+      })
+    }
+
+    if (typeof wx.cropImage === 'function') {
+      wx.showToast({ title: '拖动选框，裁剪为正方形', icon: 'none', duration: 1400 })
+      wx.cropImage({
+        src: tempPath,
+        cropScale: '1:1',
+        success: (r) => persist(r.tempFilePath),
+        fail: (err) => {
+          const msg = (err && err.errMsg) || ''
+          if (msg.indexOf('cancel') >= 0) return // 用户取消裁剪，不保存
+          // 不支持裁剪（旧基础库/个别机型）则退回原图
+          persist(tempPath)
+        }
+      })
+    } else {
+      persist(tempPath)
+    }
   },
 
   /* ===== 原图开关 ===== */
@@ -1409,14 +1458,9 @@ Page({
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
     const titleText = state.scope.level === 'province'
-      ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '浙江') + '打卡'
+      ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '浙江')
       : '我的旅行地图'
     ctx.fillText(titleText, 130, 180)
-
-    // 去过的地方（仅列出地名，不含计数）
-    ctx.fillStyle = template.accent
-    ctx.font = `700 35px ${TEXT_FONT}`
-    ctx.fillText(this.getVisitedText(), 134, 244)
 
     // 头像 + 昵称
     const nickname = state.profile.nickname
@@ -1458,37 +1502,44 @@ Page({
       }
     }
 
-    // 地图轮廓投影：沿中国地图整体轮廓生成柔和悬浮阴影（非方框）
-    ctx.save()
-    ctx.translate(0, 250)
-    ctx.scale(POSTER_W / mc.viewbox, POSTER_W / mc.viewbox)
-    ctx.shadowColor = 'rgba(54, 45, 30, 0.22)'
-    ctx.shadowBlur = 30
-    ctx.shadowOffsetX = 0
-    ctx.shadowOffsetY = 16
-    ctx.beginPath()
-    mc.regions.forEach(r => tracePath(ctx, r.d))
-    ctx.fillStyle = template.paper
-    ctx.fill()
-    ctx.restore()
+    // 地图轮廓投影：沿"主区域"轮廓生成柔和悬浮阴影（非方框）。
+    // 用与 drawMap 完全相同的变换与区域划分，保证阴影与主地图对齐；
+    // 且不含离岛/飞地（海南·三沙市、台湾·金門等）的跨海完整轮廓，
+    // 避免出现与主图错位的"旧轮廓"残影。
+    {
+      const isProvince = state.scope.level === 'province'
+      const plan = this.getMapRenderPlan({ x: 0, y: 250, w: POSTER_W, h: POSTER_W }, mc, isProvince)
+      ctx.save()
+      ctx.translate(plan.tx, plan.ty)
+      ctx.scale(plan.scale, plan.scale)
+      ctx.shadowColor = 'rgba(54, 45, 30, 0.22)'
+      ctx.shadowBlur = 30
+      ctx.shadowOffsetX = 0
+      ctx.shadowOffsetY = 16
+      ctx.beginPath()
+      plan.mainRegions.forEach(r => tracePath(ctx, r.d))
+      ctx.fillStyle = template.paper
+      ctx.fill()
+      ctx.restore()
+    }
 
     // 地图（海报模式下不显示选中省份绿框）—— 满幅绘制，使海报上的地图与上方交互地图等大
     this.drawMap(ctx, { x: 0, y: 250, w: POSTER_W, h: POSTER_W }, posterImages, null)
 
-    // 去过的地方展示
-    ctx.fillStyle = 'rgba(30, 43, 37, 0.68)'
-    ctx.font = `500 34px ${TEXT_FONT}`
+    // 去过的地方（普通文字样式，全部显示，不省略）
+    ctx.fillStyle = 'rgba(30, 43, 37, 0.72)'
+    ctx.font = `500 30px ${TEXT_FONT}`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
     const visitedText = this.getVisitedText()
-    drawWrappedText(ctx, visitedText, 130, 1750, 960, 50, 2)
+    const vLines = drawWrappedText(ctx, visitedText, 130, 1716, 1180, 44, 8)
 
-    // 日期
+    // 日期（紧跟在地名下方，随行数自动下移）
     const now = new Date()
     const dateText = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`
     ctx.fillStyle = template.title
-    ctx.font = `700 34px ${TEXT_FONT}`
-    ctx.fillText(dateText, 130, 1840)
+    ctx.font = `700 30px ${TEXT_FONT}`
+    ctx.fillText(dateText, 130, 1716 + vLines * 44 + 22)
 
     // 导出
     wx.canvasToTempFilePath({

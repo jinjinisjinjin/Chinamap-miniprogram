@@ -13,7 +13,7 @@
 
   <!-- 顶栏 -->
   <view class="header">
-    <text class="title">我的旅行地图</text>
+    <text class="title">途途相册</text>
   </view>
 
   <!-- 地图 -->
@@ -22,7 +22,9 @@
       type="2d"
       id="mapCanvas"
       class="map-canvas"
-      bindtap="onMapTap"
+      bindtouchstart="onMapTouchStart"
+      bindtouchmove="onMapTouchMove"
+      bindtouchend="onMapTap"
     ></canvas>
     <text class="map-brand" wx:if="{{scopeLevel === 'province'}}">{{scopeProvinceName}}</text>
   </view>
