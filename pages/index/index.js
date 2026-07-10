@@ -1,6 +1,8 @@
 const { tracePath, splitPath, getPathBounds } = require('../../utils/svg-path.js')
-const { regions, boundaryPath } = require('../../utils/map-data.js')
+const { regions: cnRegionsRaw, boundaryPath } = require('../../utils/map-data.js')
+const { regions: worldRegionsRaw } = require('../../utils/world-data.js')
 const geo = require('../../utils/geo.js')
+const worldGeo = require('../../utils/world-geo.js')
 
 /* ===== 常量 ===== */
 const MAP_VIEWBOX = 1200
@@ -30,13 +32,18 @@ const templates = {
   }
 }
 
+/* ===== 中国 / 世界 双模式数据源 ===== */
+const cnRegions = (cnRegionsRaw && cnRegionsRaw.length > 0) ? cnRegionsRaw : []
+const worldRegions = (worldRegionsRaw && worldRegionsRaw.length > 0) ? worldRegionsRaw : []
+
 /* ===== 状态 ===== */
 const state = {
+  mode: 'cn',  // 'cn' = 中国 34 省；'world' = 全球 7 大洲→国家
   activeId: '',
   template: 'minimal',
   photos: new Map(),
   profile: { avatar: '', nickname: '', avatarImg: null },
-  provinces: (regions && regions.length > 0) ? regions : [],
+  provinces: cnRegions,
   scope: { level: 'country', provinceId: '' },
   provinceRegionsCache: {},
 }
@@ -200,6 +207,7 @@ function getHKMacauInsetData() {
 Page({
   data: {
     activeName: '',
+    mode: 'cn',
     uploadLabel: '上传照片',
     templateName: '极简白底',
     currentTemplate: 'minimal',
@@ -228,7 +236,8 @@ Page({
   },
 
   onLoad() {
-    state.provinces = (regions && regions.length > 0) ? regions : []
+    state.mode = 'cn'
+    state.provinces = cnRegions
     const provinces = state.provinces
     state._imagesLoaded = false
     this.loadState()  // 先恢复上次保存的照片/资料
@@ -411,20 +420,26 @@ Page({
         return { regions: regs, viewbox: NORM_VIEWBOX, showBoundary: false, showInsets: false }
       }
     }
+    if (state.mode === 'world') {
+      // 全球层：无国界线、无南海/港澳放大框
+      return { regions: state.provinces, viewbox: MAP_VIEWBOX, showBoundary: false, showInsets: false }
+    }
     return { regions: state.provinces, viewbox: MAP_VIEWBOX, showBoundary: true, showInsets: true }
   },
 
   // 某 region 在当前层级下的照片 key
   photoKeyOf(region) {
-    if (state.scope.level === 'province') return state.scope.provinceId + ':' + region.id
-    return region.id
+    const pre = state.mode === 'world' ? 'world:' : ''
+    if (state.scope.level === 'province') return pre + state.scope.provinceId + ':' + region.id
+    return pre + region.id
   },
 
   // 当前选中单元（省 or 市）的照片 key
   currentPhotoKey() {
     if (!state.activeId) return ''
-    if (state.scope.level === 'province') return state.scope.provinceId + ':' + state.activeId
-    return state.activeId
+    const pre = state.mode === 'world' ? 'world:' : ''
+    if (state.scope.level === 'province') return pre + state.scope.provinceId + ':' + state.activeId
+    return pre + state.activeId
   },
 
   /* ===== 地图渲染 ===== */
@@ -532,20 +547,34 @@ Page({
    * 且阴影只覆盖"主陆地"，不含离岛/飞地（海南·三沙市、台湾·金門等）的跨海轮廓，
    * 避免出现与主图错位的"旧轮廓"残影。 */
   getMapRenderPlan(area, mc, isProvince) {
-    let insetRegions = []
-    let mainRegions = mc.regions
-    let scale = area.w / mc.viewbox
-    let tx = area.x
-    let ty = area.y
-    if (isProvince && mc.viewbox === NORM_VIEWBOX) {
-      insetRegions = this.getProvinceIslands(mc.regions)
-      mainRegions = mc.regions.filter(r => insetRegions.indexOf(r) < 0)
-      const cb = this.computeContentBounds(mainRegions)
-      const fit = 0.94
-      scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
-      tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
-      ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
+    if (!isProvince) {
+      // 全国层
+      if (state.mode === 'world') {
+        // 全球层：按实际内容包围盒 fit 居中（地图铺满画布）
+        const cb = this.computeContentBounds(mc.regions)
+        const fit = 0.92
+        const scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
+        const tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
+        const ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
+        return { tx, ty, scale, mainRegions: mc.regions, insetRegions: [] }
+      }
+      // 中国全国层：按宽度缩放、左上对齐（保持已上线外观）
+      return { tx: area.x, ty: area.y, scale: area.w / mc.viewbox, mainRegions: mc.regions, insetRegions: [] }
     }
+    // 省内 / 大洲下级视图：识别离岛/飞地，主陆地 fit 居中
+    let insetRegions = []
+    if (state.mode === 'world' && state.scope.provinceId === 'oceania') {
+      // 大洋洲：仅把斐济、新西兰作为放大补充图（其余岛国留在主视图）
+      insetRegions = mc.regions.filter(r => r.id === 'FJI' || r.id === 'NZL')
+    } else {
+      insetRegions = this.getProvinceIslands(mc.regions)
+    }
+    const mainRegions = mc.regions.filter(r => insetRegions.indexOf(r) < 0)
+    const cb = this.computeContentBounds(mainRegions)
+    const fit = 0.94
+    const scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
+    const tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
+    const ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
     return { tx, ty, scale, mainRegions, insetRegions }
   },
 
@@ -663,7 +692,7 @@ Page({
       ctx.fillText(labelled.name, labelled.label[0], labelled.label[1])
     }
 
-    // 放大图（仅全国层）
+    // 放大图（仅中国全国层）
     if (mc.showInsets) {
       this.drawSouthSeaInset(ctx, template, posterImages, highlightId)
       this.drawHongKongMacauInset(ctx, template, posterImages, highlightId)
@@ -671,9 +700,13 @@ Page({
 
     ctx.restore()
 
-    // 省内离岛缩小补充图（屏幕坐标悬浮卡片；海南在右下、台湾在左下）
+    // 省内 / 大洲下级离岛缩小补充图（屏幕坐标悬浮卡片）
     if (isProvince && insetRegions.length) {
-      this.drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions, insetSide, insetTitleAbove)
+      if (state.mode === 'world' && state.scope.provinceId === 'oceania') {
+        this.drawOceaniaIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions)
+      } else {
+        this.drawProvinceIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions, insetSide, insetTitleAbove)
+      }
     }
   },
 
@@ -843,11 +876,11 @@ Page({
     const oy = innerTop + (innerH - ch) / 2 - minY * s
 
     // 记录命中信息供 hitTest 使用
-    this._provinceInset = {
+    this._provinceInset = [{
       frame: { x: fx, y: fy, w: frameW, h: frameH },
       inner: { ox, oy, s },
       regions: insetRegions
-    }
+    }]
 
     ctx.save()
     // 卡片框（与全国地图南海诸岛风格一致）
@@ -872,7 +905,7 @@ Page({
 
     // 离岛路径
     insetRegions.forEach(region => {
-      const key = state.scope.level === 'province' ? state.scope.provinceId + ':' + region.id : region.id
+      const key = this.photoKeyOf(region)
       const img = getPhotoImage(key, posterImages)
 
       if (img) {
@@ -903,6 +936,88 @@ Page({
     })
 
     ctx.restore()
+  },
+
+  /* ===== 大洋洲离岛/飞地缩小补充图（斐济 / 新西兰，垂直堆叠于右下角） ===== */
+  drawOceaniaIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions) {
+    if (highlightId === undefined) highlightId = state.activeId
+    const regs = insetRegions
+    if (!regs || !regs.length) return
+
+    const margin = 10
+    const gap = 8
+    const boxW = Math.min(area.w * 0.26, 160)
+    const boxH = boxW * 0.90
+
+    const totalH = regs.length * boxH + (regs.length - 1) * gap
+    let baseY = area.y + area.h - totalH - margin
+    const baseX = area.x + area.w - boxW - margin
+
+    const slots = regs.map((region, i) => ({
+      fx: baseX,
+      fy: baseY + i * (boxH + gap),
+      region
+    }))
+
+    const entries = []
+    slots.forEach(({ fx, fy, region }) => {
+      entries.push({ frame: { x: fx, y: fy, w: boxW, h: boxH }, regions: [region] })
+
+      const key = this.photoKeyOf(region)
+      const img = getPhotoImage(key, posterImages)
+      const pad = 6
+      const titleH = 18
+      const ix = fx + pad
+      const iy = fy + titleH
+      const iw = boxW - pad * 2
+      const ih = boxH - titleH - pad
+
+      const b = region.bbox
+      const bw = b[2], bh = b[3]
+      const s = Math.min(iw / bw, ih / bh) * 0.96
+      const ox = ix + (iw - bw * s) / 2 - b[0] * s
+      const oy = iy + (ih - bh * s) / 2 - b[1] * s
+
+      ctx.save()
+      roundRect(ctx, fx, fy, boxW, boxH, 8)
+      ctx.fillStyle = 'rgba(255, 250, 241, 0.94)'
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(135, 119, 93, 0.5)'
+      ctx.lineWidth = 1.0
+      ctx.stroke()
+
+      ctx.fillStyle = '#5d675f'
+      ctx.font = `800 ${Math.max(10, boxW * 0.08)}px ${TEXT_FONT}`
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillText(region.name, fx + 8, fy + 13)
+
+      ctx.save()
+      ctx.translate(ox, oy)
+      ctx.scale(s, s)
+      ctx.beginPath()
+      tracePath(ctx, region.d)
+      if (img) {
+        ctx.save()
+        ctx.clip()
+        ctx.translate(-ox, -oy)
+        ctx.scale(1 / s, 1 / s)
+        drawCoverImage(ctx, img, ix, iy, iw, ih)
+        ctx.restore()
+      } else {
+        ctx.fillStyle = template.empty
+        ctx.fill()
+      }
+      ctx.strokeStyle = region.id === highlightId ? template.active : 'rgba(135, 119, 93, 0.55)'
+      ctx.lineWidth = 1.4 / s
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+      ctx.restore()
+
+      ctx.restore()
+    })
+
+    if (entries.length) this._provinceInset = entries
   },
 
   /* ===== 点击省份（命中检测） ===== */
@@ -942,24 +1057,28 @@ Page({
     const sx = mapDispW / MAP_VIEWBOX
     const sy = mapDispH / MAP_VIEWBOX
 
-    // ① 省内离岛补充图优先命中（屏幕坐标）
-    const inset = this._provinceInset
-    if (inset && state.scope.level === 'province') {
-      const f = inset.frame
-      if (cssX >= f.x && cssX <= f.x + f.w && cssY >= f.y && cssY <= f.y + f.h) {
-        ctx.save()
-        ctx.setTransform(1, 0, 0, 1, 0, 0)
-        ctx.scale(mapDpr, mapDpr)
-        ctx.translate(inset.inner.ox, inset.inner.oy)
-        ctx.scale(inset.inner.s, inset.inner.s)
-        let hit = null
-        for (const region of inset.regions) {
-          ctx.beginPath()
-          tracePath(ctx, region.d)
-          if (ctx.isPointInPath(cssX * mapDpr, cssY * mapDpr)) { hit = region; break }
+    // ① 省内 / 大洲下级离岛补充图优先命中（屏幕坐标，支持多个独立框）
+    const insetBoxes = this._provinceInset
+    if (insetBoxes && insetBoxes.length && state.scope.level === 'province') {
+      for (const inset of insetBoxes) {
+        const f = inset.frame
+        if (cssX >= f.x && cssX <= f.x + f.w && cssY >= f.y && cssY <= f.y + f.h) {
+          // 长方形板块（如大洋洲离岛）直接以边框命中，无需路径测试
+          if (!inset.inner) return inset.regions[0]
+          ctx.save()
+          ctx.setTransform(1, 0, 0, 1, 0, 0)
+          ctx.scale(mapDpr, mapDpr)
+          ctx.translate(inset.inner.ox, inset.inner.oy)
+          ctx.scale(inset.inner.s, inset.inner.s)
+          let hit = null
+          for (const region of inset.regions) {
+            ctx.beginPath()
+            tracePath(ctx, region.d)
+            if (ctx.isPointInPath(cssX * mapDpr, cssY * mapDpr)) { hit = region; break }
+          }
+          ctx.restore()
+          return hit || inset.regions[0]
         }
-        ctx.restore()
-        return hit || inset.regions[0]
       }
     }
 
@@ -1034,7 +1153,9 @@ Page({
 
   /* ===== 进入省内（显示该省地级市地图） ===== */
   enterProvince(provinceId) {
-    const regs = geo.getProvinceRegions(provinceId, state.provinceRegionsCache)
+    const regs = state.mode === 'world'
+      ? worldGeo.getRegionRegions(provinceId, state.provinceRegionsCache)
+      : geo.getProvinceRegions(provinceId, state.provinceRegionsCache)
     if (!regs || regs.length === 0) {
       this.selectRegion(provinceId)
       return
@@ -1073,15 +1194,49 @@ Page({
   /* ===== 顶层导航栏（横向滚动标签条：全国 / 各省） ===== */
   buildNavItems() {
     const provinces = state.provinces
-    const fujian = provinces.find(p => p.id === '350000')
-    const others = provinces.filter(p => p.id !== '350000')
-    const items = [{ id: 'country', name: '全国', type: 'country' }]
-    if (fujian) items.push({ id: fujian.id, name: fujian.name, type: 'province' })
-    others.forEach(p => items.push({ id: p.id, name: p.name, type: 'province' }))
+    let items
+    if (state.mode === 'world') {
+      // 全球：各大洲为可下钻项，末尾追加「世界」回到全球层
+      items = provinces.map(p => ({ id: p.id, name: p.name, type: 'region' }))
+      items.push({ id: 'country', name: '世界', type: 'country' })
+    } else {
+      const fujian = provinces.find(p => p.id === '350000')
+      const others = provinces.filter(p => p.id !== '350000')
+      items = [{ id: 'country', name: '全国', type: 'country' }]
+      if (fujian) items.push({ id: fujian.id, name: fujian.name, type: 'province' })
+      others.forEach(p => items.push({ id: p.id, name: p.name, type: 'province' }))
+    }
     this.setData({
       navItems: items,
       activeNavId: state.scope.level === 'province' ? state.scope.provinceId : 'country'
     })
+  },
+
+  /* ===== 中国 / 全球 模式切换 ===== */
+  onModeTap(e) {
+    const mode = e.currentTarget.dataset.mode
+    if (!mode || mode === state.mode) return
+    this.setMode(mode)
+  },
+
+  setMode(mode) {
+    state.mode = mode
+    state.provinces = mode === 'world' ? worldRegions : cnRegions
+    state.scope = { level: 'country', provinceId: '' }
+    const first = state.provinces[0]
+    state.activeId = first ? first.id : ''
+    this.setData({
+      mode,
+      regionNames: state.provinces.map(p => p.name),
+      regionIndex: 0,
+      scopeLevel: 'country',
+      scopeProvinceName: '',
+      activeNavId: 'country',
+      canGenerate: state.provinces.length > 0,
+    })
+    this.buildNavItems()
+    this.renderMap()
+    this.syncPanel()
   },
 
   onNavTap(e) {
@@ -1459,7 +1614,7 @@ Page({
     ctx.textBaseline = 'alphabetic'
     const titleText = state.scope.level === 'province'
       ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '浙江')
-      : '我的旅行地图'
+      : (state.mode === 'world' ? '我的世界旅行地图' : '我的旅行地图')
     ctx.fillText(titleText, 130, 180)
 
     // 头像 + 昵称

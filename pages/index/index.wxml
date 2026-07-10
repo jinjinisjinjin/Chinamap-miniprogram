@@ -1,4 +1,10 @@
 <view class="app">
+  <!-- 中国 / 全球 切换 -->
+  <view class="mode-switch">
+    <view class="mode-btn {{mode === 'cn' ? 'active' : ''}}" data-mode="cn" bindtap="onModeTap">中国</view>
+    <view class="mode-btn {{mode === 'world' ? 'active' : ''}}" data-mode="world" bindtap="onModeTap">全球</view>
+  </view>
+
   <!-- 顶层导航栏：横向滚动标签条（全国 / 各省） -->
   <scroll-view class="topnav" scroll-x enable-flex>
     <view
