@@ -3,23 +3,6 @@
   font-family: "KaiTi", "STKaiti", "楷体", "Kaiti SC", serif;
 }
 
-/* ===== 顶栏 ===== */
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 8rpx 4rpx 16rpx;
-  margin-top: 18rpx;
-}
-
-.title {
-  font-family: "STKaiti", "KaiTi", serif;
-  font-size: 52rpx;
-  font-weight: 700;
-  line-height: 1.1;
-  color: #1e2b25;
-}
-
 /* ===== 中国 / 全球 切换 ===== */
 .mode-switch {
   display: flex;
@@ -593,6 +576,16 @@
   color: #1e2b25;
   font-size: 44rpx;
   line-height: 1;
+}
+
+/* ===== 页脚品牌 ===== */
+.footer-brand {
+  text-align: center;
+  margin: 8rpx 0 4rpx;
+  font-family: "KaiTi", "STKaiti", "楷体", "Kaiti SC", serif;
+  font-size: 22rpx;
+  color: #a89e8e;
+  letter-spacing: 2rpx;
 }
 
 /* ===== 隐藏的海报画布 ===== */

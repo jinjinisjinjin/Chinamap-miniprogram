@@ -17,11 +17,6 @@
     >{{item.name}}</view>
   </scroll-view>
 
-  <!-- 顶栏 -->
-  <view class="header">
-    <text class="title">途途相册</text>
-  </view>
-
   <!-- 地图 -->
   <view class="map-stage">
     <canvas
@@ -194,6 +189,9 @@
       <text wx:else class="poster-empty">生成后预览</text>
     </view>
   </view>
+
+  <!-- 页脚品牌 -->
+  <view class="footer-brand">途途相册</view>
 
   <!-- 隐私授权弹窗 -->
   <view class="privacy-mask" wx:if="{{privacyVisible}}">
