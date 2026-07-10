@@ -191,7 +191,7 @@
   </view>
 
   <!-- 页脚品牌 -->
-  <view class="footer-brand">途途相册</view>
+  <view class="footer-brand">途途相册，拍下足迹，点亮世界。</view>
 
   <!-- 隐私授权弹窗 -->
   <view class="privacy-mask" wx:if="{{privacyVisible}}">
