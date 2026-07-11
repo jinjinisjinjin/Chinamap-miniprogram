@@ -1,0 +1,1 @@
+{"name": "imgSecCheck", "version": "1.0.0", "description": "图片内容安全检测（调用微信 openapi.security.imgSecCheck）", "main": "index.js", "scripts": {"test": "echo \"Error: no test specified\" && exit 1"}, "dependencies": {"wx-server-sdk": "~2.6.3"}}

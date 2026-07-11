@@ -48,6 +48,7 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
+  "cloudfunctionRoot": "cloudfunctions/",
   "libVersion": "3.16.2",
   "appid": "wxe95b10a89e4381fd",
   "projectname": "travelmap-miniprogram",

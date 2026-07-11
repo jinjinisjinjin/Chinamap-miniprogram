@@ -1344,8 +1344,13 @@ Page({
       sizeType: this.data.useOriginal ? ['original'] : ['compressed'],
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
-        // 选图后引导用户裁剪为正方形，避免照片被拉伸变形
-        this.cropAndPersistPhoto(tempPath)
+        // 先做内容安全检测，通过后才裁剪保存
+        this.checkImageSecurity(tempPath).then(() => {
+          this.cropAndPersistPhoto(tempPath)
+        }).catch((err) => {
+          if (err && err.message === 'SEC_RISK') return // 已 toast 提示
+          console.warn('安全检测异常，未拦截:', err)
+        })
       },
       fail: (err) => {
         const msg = (err && err.errMsg) || ''
@@ -1353,6 +1358,47 @@ Page({
         console.error('chooseMedia fail:', err)
         wx.showToast({ title: msg || '选择失败', icon: 'none' })
       }
+    })
+  },
+
+  /* ===== 图片内容安全检测 ===== */
+  checkImageSecurity(tempFilePath) {
+    return new Promise((resolve, reject) => {
+      wx.showLoading({ title: '安全检测中', mask: true })
+      const fsm = wx.getFileSystemManager()
+      fsm.readFile({
+        filePath: tempFilePath,
+        encoding: 'base64',
+        success: (readRes) => {
+          wx.cloud.callFunction({
+            name: 'imgSecCheck',
+            data: {
+              value: readRes.data,
+              contentType: 'image/jpeg'
+            }
+          }).then((res) => {
+            wx.hideLoading()
+            const result = res.result
+            if (result.code === 0) {
+              resolve() // 检测通过
+            } else if (result.code === 87009) {
+              wx.showToast({ title: '图片含违规内容', icon: 'none', duration: 2000 })
+              reject(new Error('SEC_RISK'))
+            } else {
+              console.warn('imgSecCheck 异常:', result.msg)
+              resolve() // 检测服务异常时放行，避免阻塞正常使用
+            }
+          }).catch((err) => {
+            wx.hideLoading()
+            console.warn('imgSecCheck 调用失败:', err)
+            resolve() // 网络异常等放行，不阻塞用户
+          })
+        },
+        fail: () => {
+          wx.hideLoading()
+          resolve() // 读文件失败放行，不阻塞用户
+        }
+      })
     })
   },
 
@@ -1417,12 +1463,18 @@ Page({
       sizeType: this.data.useOriginal ? ['original'] : ['compressed'],
       success: (res) => {
         const tempPath = res.tempFiles[0].tempFilePath
-        const oldAvatar = state.profile.avatar
-        persistTempFile(tempPath, 'avatar').then((persistPath) => {
-          if (isPersistPath(oldAvatar)) removeFileSafe(oldAvatar)
-          state.profile.avatar = persistPath
-          this.setData({ avatarUrl: persistPath, hasAvatar: true })
-          this.saveState()
+        // 先做内容安全检测，通过后才保存头像
+        this.checkImageSecurity(tempPath).then(() => {
+          const oldAvatar = state.profile.avatar
+          persistTempFile(tempPath, 'avatar').then((persistPath) => {
+            if (isPersistPath(oldAvatar)) removeFileSafe(oldAvatar)
+            state.profile.avatar = persistPath
+            this.setData({ avatarUrl: persistPath, hasAvatar: true })
+            this.saveState()
+          })
+        }).catch((err) => {
+          if (err && err.message === 'SEC_RISK') return // 已 toast 提示
+          console.warn('安全检测异常，未拦截:', err)
         })
       },
       fail: (err) => {
