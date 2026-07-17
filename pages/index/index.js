@@ -1130,8 +1130,15 @@ Page({
     ctx.scale(xf.scale, xf.scale)
 
     const mc = this.getMapContext()
+    // 省内/洲内层排除已画在离岛补充框里的区域（从 _provinceInset 收集）
+    let insetRegionIds = []
+    if (state.scope.level === 'province' && this._provinceInset && this._provinceInset.length) {
+      for (const ib of this._provinceInset) {
+        if (ib.regions) insetRegionIds = insetRegionIds.concat(ib.regions.map(r => r.id))
+      }
+    }
     const regions = state.scope.level === 'province'
-      ? mc.regions.filter(r => !inset || inset.regions.indexOf(r) < 0)
+      ? mc.regions.filter(r => insetRegionIds.indexOf(r.id) < 0)
       : mc.regions
 
     // 将点击的 CSS 像素坐标转为地图归一化坐标（用于 bbox 预筛选）
