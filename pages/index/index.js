@@ -867,14 +867,20 @@ Page({
     if (bw <= 0 || bh <= 0) return
 
     // 卡片尺寸（屏幕/area 坐标，悬浮于角落）
-    // 仅全球模式·欧洲/非洲：离岛补充框放左上角（避免挡住主大陆/利用左侧空白）；其他大洲仍放右下角
+    // 全球模式左侧定位：欧洲→左上角；非洲→左侧中间偏下（利用左侧空白不挡主大陆）
+    // 其余大洲仍放右下角
     const margin = 12
     const frameW = Math.min(area.w * 0.28, 200)
     const frameH = frameW * 0.7
-    const isWorldLeftSide = state.mode === 'world' && state.scope.level === 'province' &&
-      (state.scope.provinceId === 'europe' || state.scope.provinceId === 'africa')
+    const isWorldEurope = state.mode === 'world' && state.scope.level === 'province' && state.scope.provinceId === 'europe'
+    const isWorldAfrica = state.mode === 'world' && state.scope.level === 'province' && state.scope.provinceId === 'africa'
+    const isWorldLeftSide = isWorldEurope || isWorldAfrica
     const fx = (side === 'left' || isWorldLeftSide) ? area.x + margin : area.x + area.w - frameW - margin
-    const fy = isWorldLeftSide ? area.y + margin : area.y + area.h - frameH - margin
+    const fy = isWorldEurope
+      ? area.y + margin
+      : isWorldAfrica
+        ? Math.min(area.y + area.h * 0.58, area.y + area.h - frameH - margin)
+        : area.y + area.h - frameH - margin
 
     // 内区（台湾标题在框上方，内区占满整框；海南标题在框内顶部）
     const pad = 20
