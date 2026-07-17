@@ -1708,7 +1708,7 @@ Page({
     ctx.textBaseline = 'alphabetic'
     const titleText = state.scope.level === 'province'
       ? ((state.provinces.find(p => p.id === state.scope.provinceId) || {}).name || '浙江')
-      : (state.mode === 'world' ? '我的世界旅行地图' : '我的旅行地图')
+      : '我的旅行地图'
     ctx.fillText(titleText, 130, 180)
 
     // 头像 + 昵称
