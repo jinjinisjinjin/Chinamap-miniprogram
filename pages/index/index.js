@@ -553,7 +553,12 @@ Page({
         // 全球层：按实际内容包围盒 fit 居中（地图铺满画布）
         const cb = this.computeContentBounds(mc.regions)
         const fit = 0.92
-        const scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
+        const safeW = area.w > 10 ? area.w : MAP_VIEWBOX
+        const safeH = area.h > 10 ? area.h : MAP_VIEWBOX
+        const rawScale = Math.min(safeW / cb.w, safeH / cb.h) * fit
+        // clamp：防止极端数据导致 scale 异常（如某洲坐标异常偏移）
+        const maxScale = Math.min(safeW, safeH) * 1.5 / Math.max(cb.w, cb.h)
+        const scale = Math.min(rawScale, Math.max(maxScale, 0.01))
         const tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
         const ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
         return { tx, ty, scale, mainRegions: mc.regions, insetRegions: [] }
@@ -572,7 +577,13 @@ Page({
     const mainRegions = mc.regions.filter(r => insetRegions.indexOf(r) < 0)
     const cb = this.computeContentBounds(mainRegions)
     const fit = 0.94
-    const scale = Math.min(area.w / cb.w, area.h / cb.h) * fit
+    // 安全防护：画布尺寸未就绪时回退到 viewbox 等比例（防止除零或极端缩放）
+    const safeW = area.w > 10 ? area.w : NORM_VIEWBOX
+    const safeH = area.h > 10 ? area.h : NORM_VIEWBOX
+    // clamp：限制最大缩放不超过画布短边的 1.2 倍（防止某些洲数据接近满幅时溢出）
+    const rawScale = Math.min(safeW / cb.w, safeH / cb.h) * fit
+    const maxScale = Math.min(safeW, safeH) * 1.2 / Math.max(cb.w, cb.h)
+    const scale = Math.min(rawScale, maxScale)
     const tx = area.x + (area.w - cb.w * scale) / 2 - cb.x * scale
     const ty = area.y + (area.h - cb.h * scale) / 2 - cb.y * scale
     return { tx, ty, scale, mainRegions, insetRegions }
@@ -1048,7 +1059,12 @@ Page({
     if (!t) return
     const region = this.hitTest(t.x, t.y)
     if (!region) return
-    // 顶层导航栏是唯一进省入口（点地图/下拉只做"选中高亮"，不自动进省）
+    // 全球模式：顶层点大洲直接钻取进下级国家视图（与导航栏行为一致）
+    if (state.mode === 'world' && state.scope.level === 'country') {
+      this.enterProvince(region.id)
+      return
+    }
+    // 中国模式 / 已在省内：只做选中高亮，进省走导航栏
     this.selectRegion(region.id)
   },
 
@@ -1118,6 +1134,7 @@ Page({
       ? mc.regions.filter(r => !inset || inset.regions.indexOf(r) < 0)
       : mc.regions
 
+    // 将点击的 CSS 像素坐标转为地图归一化坐标（用于 bbox 预筛选）
     const nx = (cssX - xf.tx) / xf.scale
     const ny = (cssY - xf.ty) / xf.scale
 
@@ -1128,11 +1145,13 @@ Page({
       ctx.beginPath()
       tracePath(ctx, province.d)
       try {
+        // isPointInPath 在当前变换矩阵下检测（与 drawMap 绘制时一致）
         if (ctx.isPointInPath(cssX * mapDpr, cssY * mapDpr)) {
           ctx.restore()
           return province
         }
       } catch (err) {
+        // 路径过于复杂时降级为包围盒命中（罕见但可能发生在极多点的路径上）
         ctx.restore()
         return province
       }
