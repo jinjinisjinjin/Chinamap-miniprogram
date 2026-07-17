@@ -1059,12 +1059,8 @@ Page({
     if (!t) return
     const region = this.hitTest(t.x, t.y)
     if (!region) return
-    // 全球模式：顶层点大洲直接钻取进下级国家视图（与导航栏行为一致）
-    if (state.mode === 'world' && state.scope.level === 'country') {
-      this.enterProvince(region.id)
-      return
-    }
-    // 中国模式 / 已在省内：只做选中高亮，进省走导航栏
+    // 点地图只做选中高亮（与中国模式一致）：顶层选中大洲/省，省内选中市/国家；
+    // 钻取进下级走顶部导航栏，避免点地图时意外跳页
     this.selectRegion(region.id)
   },
 
