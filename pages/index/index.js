@@ -904,16 +904,23 @@ Page({
     ctx.lineWidth = 1.0
     ctx.stroke()
 
-    // 标题（台湾：框正上方居中、字号更小；海南：框内顶部）
+    // 标题
+    // 台湾：框正上方居中；海南/默认：框内顶部；
+    // 欧洲（左上角框）：文字放在方框右侧外部，避免重叠挡视线
     ctx.fillStyle = '#5d675f'
     ctx.font = `800 ${titleAbove ? 10 : 11}px ${TEXT_FONT}`
     ctx.textBaseline = 'alphabetic'
+    const labelStr = insetRegions.map(r => r.name).join('·')
     if (titleAbove) {
       ctx.textAlign = 'center'
-      ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + frameW / 2, fy - 7)
+      ctx.fillText(labelStr, fx + frameW / 2, fy - 7)
+    } else if (isWorldEurope) {
+      // 文字紧贴方框右侧外部，垂直居中对齐框高
+      ctx.textAlign = 'left'
+      ctx.fillText(labelStr, fx + frameW + margin * 0.8, fy + frameH / 2)
     } else {
       ctx.textAlign = 'left'
-      ctx.fillText(insetRegions.map(r => r.name).join('·'), fx + 14, fy + 20)
+      ctx.fillText(labelStr, fx + 14, fy + 20)
     }
 
     // 离岛路径
