@@ -913,7 +913,7 @@ Page({
 
     // 标题
     // 台湾：框正上方居中；海南/默认：框内顶部；
-    // 欧洲（左上角框）：文字放在方框右侧外部，避免重叠挡视线
+    // 欧洲（左上角框）：文字在方框右侧外部；非洲（左侧中间偏下框）：文字在框正上方
     ctx.fillStyle = '#5d675f'
     ctx.font = `800 ${titleAbove ? 10 : 11}px ${TEXT_FONT}`
     ctx.textBaseline = 'alphabetic'
@@ -921,10 +921,14 @@ Page({
     if (titleAbove) {
       ctx.textAlign = 'center'
       ctx.fillText(labelStr, fx + frameW / 2, fy - 7)
-    } else if (isWorldLeftSide) {
-      // 文字紧贴方框右侧外部，靠近框顶
+    } else if (isWorldEurope) {
+      // 欧洲：文字紧贴方框右侧外部，靠近框顶
       ctx.textAlign = 'left'
       ctx.fillText(labelStr, fx + frameW + margin * 0.8, fy + 16)
+    } else if (isWorldAfrica) {
+      // 非洲：文字放在方框正上方居中
+      ctx.textAlign = 'center'
+      ctx.fillText(labelStr, fx + frameW / 2, fy - 7)
     } else {
       ctx.textAlign = 'left'
       ctx.fillText(labelStr, fx + 14, fy + 20)
