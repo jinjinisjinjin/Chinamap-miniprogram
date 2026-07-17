@@ -866,12 +866,14 @@ Page({
     const bw = maxX - minX, bh = maxY - minY
     if (bw <= 0 || bh <= 0) return
 
-    // 卡片尺寸（屏幕/area 坐标，悬浮于左下或右下）
+    // 卡片尺寸（屏幕/area 坐标，悬浮于角落）
+    // 全球模式：洲内视图放左上角（避免挡住主大陆）；中国省内放右下角（岛屿在东南）
     const margin = 12
     const frameW = Math.min(area.w * 0.28, 200)
     const frameH = frameW * 0.7
-    const fx = side === 'left' ? area.x + margin : area.x + area.w - frameW - margin
-    const fy = area.y + area.h - frameH - margin
+    const isWorldProvince = state.mode === 'world' && state.scope.level === 'province'
+    const fx = (side === 'left' || isWorldProvince) ? area.x + margin : area.x + area.w - frameW - margin
+    const fy = isWorldProvince ? area.y + margin : area.y + area.h - frameH - margin
 
     // 内区（台湾标题在框上方，内区占满整框；海南标题在框内顶部）
     const pad = 20
