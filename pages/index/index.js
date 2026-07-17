@@ -867,13 +867,14 @@ Page({
     if (bw <= 0 || bh <= 0) return
 
     // 卡片尺寸（屏幕/area 坐标，悬浮于角落）
-    // 仅全球模式·欧洲：离岛补充框放左上角（避免挡住主大陆）；其他大洲仍放右下角
+    // 仅全球模式·欧洲/非洲：离岛补充框放左上角（避免挡住主大陆/利用左侧空白）；其他大洲仍放右下角
     const margin = 12
     const frameW = Math.min(area.w * 0.28, 200)
     const frameH = frameW * 0.7
-    const isWorldEurope = state.mode === 'world' && state.scope.level === 'province' && state.scope.provinceId === 'europe'
-    const fx = (side === 'left' || isWorldEurope) ? area.x + margin : area.x + area.w - frameW - margin
-    const fy = isWorldEurope ? area.y + margin : area.y + area.h - frameH - margin
+    const isWorldLeftSide = state.mode === 'world' && state.scope.level === 'province' &&
+      (state.scope.provinceId === 'europe' || state.scope.provinceId === 'africa')
+    const fx = (side === 'left' || isWorldLeftSide) ? area.x + margin : area.x + area.w - frameW - margin
+    const fy = isWorldLeftSide ? area.y + margin : area.y + area.h - frameH - margin
 
     // 内区（台湾标题在框上方，内区占满整框；海南标题在框内顶部）
     const pad = 20
@@ -914,7 +915,7 @@ Page({
     if (titleAbove) {
       ctx.textAlign = 'center'
       ctx.fillText(labelStr, fx + frameW / 2, fy - 7)
-    } else if (isWorldEurope) {
+    } else if (isWorldLeftSide) {
       // 文字紧贴方框右侧外部，靠近框顶
       ctx.textAlign = 'left'
       ctx.fillText(labelStr, fx + frameW + margin * 0.8, fy + 16)
