@@ -915,9 +915,9 @@ Page({
       ctx.textAlign = 'center'
       ctx.fillText(labelStr, fx + frameW / 2, fy - 7)
     } else if (isWorldEurope) {
-      // 文字紧贴方框右侧外部，垂直居中对齐框高
+      // 文字紧贴方框右侧外部，靠近框顶
       ctx.textAlign = 'left'
-      ctx.fillText(labelStr, fx + frameW + margin * 0.8, fy + frameH / 2)
+      ctx.fillText(labelStr, fx + frameW + margin * 0.8, fy + 16)
     } else {
       ctx.textAlign = 'left'
       ctx.fillText(labelStr, fx + 14, fy + 20)
