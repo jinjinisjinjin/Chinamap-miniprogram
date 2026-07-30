@@ -187,14 +187,14 @@
   <view class="panel">
     <view class="panel-head">
       <text class="panel-label">海报预览</text>
+      <text class="poster-hint-inline" wx:if="{{currentTemplate === 'pure'}}">白底将隐去离岛小方框</text>
       <view class="save-link {{hasPoster ? '' : 'disabled'}}" bindtap="onSavePoster">保存图片</view>
     </view>
     <view class="poster-row">
-      <view class="poster-frame" bindtap="onPosterTap">
+      <view class="poster-frame {{currentTemplate === 'pure' ? 'poster-frame-pure' : ''}}" bindtap="onPosterTap">
         <image wx:if="{{hasPoster}}" class="poster-img" src="{{posterUrl}}" mode="aspectFit" />
         <text wx:else class="poster-empty">生成后预览</text>
       </view>
-      <view class="poster-hint" wx:if="{{currentTemplate === 'pure'}}">白底模式下会隐去南海诸岛、港澳、离岛等小方框，只保留主地图，更简约美观。</view>
     </view>
   </view>
 
