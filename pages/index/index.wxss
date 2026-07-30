@@ -519,6 +519,24 @@
   box-shadow: 0 10rpx 30rpx rgba(55, 44, 30, 0.10);
 }
 
+/* 海报预览 + 右侧说明（纯白模式显示） */
+.poster-row {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+}
+.poster-row .poster-frame {
+  flex: 1 1 auto;
+  width: auto;
+}
+.poster-hint {
+  flex: 0 0 33%;
+  align-self: center;
+  font-size: 22rpx;
+  line-height: 1.7;
+  color: #9a8f7e;
+}
+
 .poster-img {
   position: absolute;
   top: 0;

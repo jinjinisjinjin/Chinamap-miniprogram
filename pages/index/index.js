@@ -595,7 +595,7 @@ Page({
     return { tx, ty, scale, mainRegions, insetRegions }
   },
 
-  drawMap(ctx, area, posterImages, highlightId) {
+  drawMap(ctx, area, posterImages, highlightId, noInsets = false) {
     if (highlightId === undefined) highlightId = state.activeId
     const template = templates[state.template]
     const mc = this.getMapContext()
@@ -710,7 +710,7 @@ Page({
     }
 
     // 放大图（仅中国全国层）
-    if (mc.showInsets) {
+    if (mc.showInsets && !noInsets) {
       this.drawSouthSeaInset(ctx, template, posterImages, highlightId)
       this.drawHongKongMacauInset(ctx, template, posterImages, highlightId)
     }
@@ -718,7 +718,7 @@ Page({
     ctx.restore()
 
     // 省内 / 大洲下级离岛缩小补充图（屏幕坐标悬浮卡片）
-    if (isProvince && insetRegions.length) {
+    if (isProvince && insetRegions.length && !noInsets) {
       if (state.mode === 'world' && state.scope.provinceId === 'oceania') {
         this.drawOceaniaIslandsInset(ctx, area, template, posterImages, highlightId, insetRegions)
       } else {
@@ -1791,7 +1791,8 @@ Page({
     }
 
     // 地图（海报模式下不显示选中省份绿框）—— 满幅绘制，使海报上的地图与上方交互地图等大
-    this.drawMap(ctx, { x: 0, y: 250, w: POSTER_W, h: POSTER_W }, posterImages, null)
+    // 纯白底：noInsets=true，隐去所有离岛/港澳补充框，只留主地图
+    this.drawMap(ctx, { x: 0, y: 250, w: POSTER_W, h: POSTER_W }, posterImages, null, !!template.plain)
 
     // 去过的地方（普通文字样式，全部显示，不省略）—— 纯白底不画
     if (!template.plain) {
