@@ -695,7 +695,7 @@ Page({
 
     // 选中区域名称标签（统一在最后绘制，确保压在所有图块填充之上，不再被相邻图块挡住）
     const labelled = mainRegions.find(p => p.id === highlightId)
-    if (labelled && labelled.bbox[2] > 22 && labelled.bbox[3] > 18) {
+    if (!template.plain && labelled && labelled.bbox[2] > 22 && labelled.bbox[3] > 18) {
       const fs = 13 / scale
       ctx.font = `700 ${fs}px sans-serif`
       ctx.textAlign = 'center'
@@ -750,11 +750,13 @@ Page({
     ctx.stroke()
 
     // 标题
+    if (!template.plain) {
     ctx.fillStyle = '#5d675f'
     ctx.font = `800 19px ${TEXT_FONT}`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
     ctx.fillText('南海诸岛', frame.x + 18, frame.y + 31)
+    }
 
     // 照片
     const img = getPhotoImage(data.province.id, posterImages)
@@ -811,11 +813,13 @@ Page({
     ctx.lineWidth = 1.0
     ctx.stroke()
 
+    if (!template.plain) {
     ctx.fillStyle = '#5d675f'
     ctx.font = `800 18px ${TEXT_FONT}`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
     ctx.fillText('港澳', frame.x + 16, frame.y + 30)
+    }
 
     data.regions.forEach(region => {
       const img = getPhotoImage(region.id, posterImages)
@@ -920,6 +924,7 @@ Page({
     // 标题
     // 台湾：框正上方居中；海南/默认：框内顶部；
     // 欧洲（左上角框）：文字在方框右侧外部；非洲（左侧中间偏下框）：文字在框正上方
+    if (!template.plain) {
     ctx.fillStyle = '#5d675f'
     ctx.font = `800 ${titleAbove ? 10 : 11}px ${TEXT_FONT}`
     ctx.textBaseline = 'alphabetic'
@@ -938,6 +943,7 @@ Page({
     } else {
       ctx.textAlign = 'left'
       ctx.fillText(labelStr, fx + 14, fy + 20)
+    }
     }
 
     // 离岛路径
@@ -1023,11 +1029,13 @@ Page({
       ctx.lineWidth = 1.0
       ctx.stroke()
 
+      if (!template.plain) {
       ctx.fillStyle = '#5d675f'
       ctx.font = `800 ${Math.max(10, boxW * 0.08)}px ${TEXT_FONT}`
       ctx.textAlign = 'left'
       ctx.textBaseline = 'alphabetic'
       ctx.fillText(region.name, fx + 8, fy + 13)
+      }
 
       ctx.save()
       ctx.translate(ox, oy)
