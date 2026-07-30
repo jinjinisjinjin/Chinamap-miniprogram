@@ -29,6 +29,12 @@ const templates = {
     name: '青绿', empty: '#dfe8dd', border: '#f6fbf4',
     active: '#376f6b', label: '#243935', paper: '#f6fbf4',
     title: '#18332f', accent: '#376f6b', seam: '#c2d2bf'
+  },
+  pure: {
+    name: '纯白', empty: '#eef1f4', border: '#ffffff',
+    active: '#7ec8b8', label: '#9aa3ad', paper: '#ffffff',
+    title: '#ffffff', accent: '#ffffff', seam: '#dfe4ea',
+    plain: true   // 纯白底：只画地图，不画任何文字（标题/去过/日期/头像昵称）
   }
 }
 
@@ -1694,14 +1700,17 @@ Page({
     // 纸张底色
     ctx.fillStyle = template.paper
     ctx.fillRect(0, 0, POSTER_W, POSTER_H)
-    ctx.globalAlpha = 0.08
-    for (let y = 0; y < POSTER_H; y += 16) {
-      ctx.fillStyle = y % 32 === 0 ? template.accent : '#a8794b'
-      ctx.fillRect(0, y, POSTER_W, 1)
+    if (!template.plain) {
+      ctx.globalAlpha = 0.08
+      for (let y = 0; y < POSTER_H; y += 16) {
+        ctx.fillStyle = y % 32 === 0 ? template.accent : '#a8794b'
+        ctx.fillRect(0, y, POSTER_W, 1)
+      }
+      ctx.globalAlpha = 1
     }
-    ctx.globalAlpha = 1
 
-    // 标题
+    // 标题（纯白底不画任何文字）
+    if (!template.plain) {
     ctx.fillStyle = template.title
     ctx.font = `700 98px ${DISPLAY_FONT}`
     ctx.textAlign = 'left'
@@ -1750,6 +1759,7 @@ Page({
         ctx.restore()
       }
     }
+    }
 
     // 地图轮廓投影：沿"主区域"轮廓生成柔和悬浮阴影（非方框）。
     // 用与 drawMap 完全相同的变换与区域划分，保证阴影与主地图对齐；
@@ -1775,7 +1785,8 @@ Page({
     // 地图（海报模式下不显示选中省份绿框）—— 满幅绘制，使海报上的地图与上方交互地图等大
     this.drawMap(ctx, { x: 0, y: 250, w: POSTER_W, h: POSTER_W }, posterImages, null)
 
-    // 去过的地方（普通文字样式，全部显示，不省略）
+    // 去过的地方（普通文字样式，全部显示，不省略）—— 纯白底不画
+    if (!template.plain) {
     ctx.fillStyle = 'rgba(30, 43, 37, 0.72)'
     ctx.font = `500 30px ${TEXT_FONT}`
     ctx.textAlign = 'left'
@@ -1789,6 +1800,7 @@ Page({
     ctx.fillStyle = template.title
     ctx.font = `700 30px ${TEXT_FONT}`
     ctx.fillText(dateText, 130, 1716 + vLines * 44 + 22)
+    }
 
     // 导出
     wx.canvasToTempFilePath({

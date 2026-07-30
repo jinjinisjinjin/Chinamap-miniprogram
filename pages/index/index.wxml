@@ -137,6 +137,11 @@
         data-template="ink"
         bindtap="onTemplateChange"
       >青绿</view>
+      <view
+        class="template-chip {{currentTemplate === 'pure' ? 'active' : ''}}"
+        data-template="pure"
+        bindtap="onTemplateChange"
+      >纯白</view>
     </view>
   </view>
 
