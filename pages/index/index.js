@@ -31,7 +31,7 @@ const templates = {
     title: '#18332f', accent: '#376f6b', seam: '#c2d2bf'
   },
   pure: {
-    name: '纯白', empty: '#eef1f4', border: '#ffffff',
+    name: '纯白', empty: '#eef1f4', border: '#e3e7ec',
     active: '#7ec8b8', label: '#9aa3ad', paper: '#ffffff',
     title: '#ffffff', accent: '#ffffff', seam: '#dfe4ea',
     plain: true   // 纯白底：只画地图，不画任何文字（标题/去过/日期/头像昵称）
