@@ -239,6 +239,14 @@ Page({
     scopeProvinceName: '',
     navItems: [],
     activeNavId: 'country',
+    showOnboard: false,
+    onboardIndex: 0,
+    onboardSteps: [
+      { emoji: '🗺️', title: '点亮地图', desc: '点省份或大洲，上传旅途照片，它就会亮起来' },
+      { emoji: '🌍', title: '中国 ↔ 全球', desc: '右上角一键切换，去看更大的世界' },
+      { emoji: '🎨', title: '生成海报', desc: '挑个喜欢的模板，生成专属旅行地图' },
+      { emoji: '💌', title: '分享回忆', desc: '存相册或转发给朋友，把足迹留住' }
+    ],
   },
 
   onLoad() {
@@ -266,6 +274,10 @@ Page({
     this.syncPanel()
     this.buildNavItems()
     this.initPrivacy()
+    // 新手引导：未看过则首次打开弹出
+    if (!wx.getStorageSync('onboarded')) {
+      this.setData({ showOnboard: true })
+    }
   },
 
   onReady() {
@@ -1893,5 +1905,21 @@ Page({
         }
       }
     })
+  },
+
+  /* ===== 新手引导 ===== */
+  onOnboardChange(e) {
+    this.setData({ onboardIndex: e.detail.current })
+  },
+  onOnboardNext() {
+    const next = Math.min(this.data.onboardIndex + 1, this.data.onboardSteps.length - 1)
+    this.setData({ onboardIndex: next })
+  },
+  onOnboardSkip() {
+    this.setData({ showOnboard: false })
+    wx.setStorageSync('onboarded', '1')
+  },
+  onShowOnboard() {
+    this.setData({ showOnboard: true, onboardIndex: 0 })
   },
 })

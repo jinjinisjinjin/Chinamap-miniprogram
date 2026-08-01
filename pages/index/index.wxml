@@ -199,7 +199,10 @@
   </view>
 
   <!-- 页脚品牌 -->
-  <view class="footer-brand">途途相册，拍下足迹，点亮世界。</view>
+  <view class="footer-brand">
+    <text class="footer-text">途途相册，拍下足迹，点亮世界。</text>
+    <text class="onboard-replay" bindtap="onShowOnboard">新手引导</text>
+  </view>
 
   <!-- 隐私授权弹窗 -->
   <view class="privacy-mask" wx:if="{{privacyVisible}}">
@@ -225,4 +228,38 @@
 
   <!-- 隐藏的海报画布 -->
   <canvas type="2d" id="posterCanvas" class="poster-canvas-hidden"></canvas>
+
+  <!-- 新手引导 -->
+  <view class="onboard-mask" wx:if="{{showOnboard}}" catchtap="onOnboardSkip">
+    <view class="onboard-card" catchtap="">
+      <swiper
+        class="onboard-swiper"
+        current="{{onboardIndex}}"
+        bindchange="onOnboardChange"
+        indicator-dots="{{false}}"
+      >
+        <swiper-item wx:for="{{onboardSteps}}" wx:key="title">
+          <view class="onboard-step">
+            <view class="onboard-emoji">{{item.emoji}}</view>
+            <view class="onboard-step-title">{{item.title}}</view>
+            <view class="onboard-step-desc">{{item.desc}}</view>
+          </view>
+        </swiper-item>
+      </swiper>
+      <view class="onboard-dots">
+        <view
+          wx:for="{{onboardSteps}}"
+          wx:key="title"
+          class="onboard-dot {{index === onboardIndex ? 'active' : ''}}"
+        ></view>
+      </view>
+      <view class="onboard-actions">
+        <view class="onboard-skip" bindtap="onOnboardSkip">跳过</view>
+        <view
+          class="onboard-next {{onboardIndex >= onboardSteps.length - 1 ? 'finish' : ''}}"
+          bindtap="{{onboardIndex >= onboardSteps.length - 1 ? 'onOnboardSkip' : 'onOnboardNext'}}"
+        >{{onboardIndex >= onboardSteps.length - 1 ? '开始体验' : '下一步'}}</view>
+      </view>
+    </view>
+  </view>
 </view>
