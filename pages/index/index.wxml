@@ -240,7 +240,8 @@
       >
         <swiper-item wx:for="{{onboardSteps}}" wx:key="title">
           <view class="onboard-step">
-            <view class="onboard-emoji">{{item.emoji}}</view>
+            <image wx:if="{{item.img}}" class="onboard-img" src="{{item.img}}" mode="aspectFit" />
+            <view wx:else class="onboard-emoji">{{item.emoji}}</view>
             <view class="onboard-step-title">{{item.title}}</view>
             <view class="onboard-step-desc">{{item.desc}}</view>
           </view>

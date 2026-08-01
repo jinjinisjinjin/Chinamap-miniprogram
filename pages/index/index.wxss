@@ -652,6 +652,11 @@
   line-height: 1;
   margin-bottom: 28rpx;
 }
+.onboard-img {
+  width: 280rpx;
+  height: 280rpx;
+  margin-bottom: 16rpx;
+}
 .onboard-step-title {
   font-size: 38rpx;
   font-weight: 700;
