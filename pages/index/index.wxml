@@ -230,8 +230,8 @@
   <canvas type="2d" id="posterCanvas" class="poster-canvas-hidden"></canvas>
 
   <!-- 新手引导 -->
-  <view class="onboard-mask" wx:if="{{showOnboard}}" catchtap="onOnboardSkip">
-    <view class="onboard-card" catchtap="">
+  <view class="onboard-mask" wx:if="{{showOnboard}}" catchtap="onOnboardMaskTap">
+    <view class="onboard-card" catchtap="noop">
       <swiper
         class="onboard-swiper"
         current="{{onboardIndex}}"

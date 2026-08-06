@@ -1920,6 +1920,14 @@ Page({
     const next = this.data.onboardIndex + 1
     this.setData({ onboardIndex: next })
   },
+  // 只有点到蒙层自身（空白处）才关闭，卡片内点击不冒泡到此
+  onOnboardMaskTap(e) {
+    if (e.target === e.currentTarget) {
+      this.onOnboardSkip()
+    }
+  },
+  // 卡片内点击阻止冒泡到蒙层，避免误触关闭
+  noop() {},
   onOnboardSkip() {
     this.setData({ showOnboard: false })
     wx.setStorageSync('onboarded', '1')
