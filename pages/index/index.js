@@ -46,7 +46,7 @@ const worldRegions = (worldRegionsRaw && worldRegionsRaw.length > 0) ? worldRegi
 const state = {
   mode: 'cn',  // 'cn' = 中国 34 省；'world' = 全球 7 大洲→国家
   activeId: '',
-  template: 'minimal',
+  template: 'pure',
   photos: new Map(),
   profile: { avatar: '', nickname: '', avatarImg: null },
   provinces: cnRegions,
@@ -215,8 +215,8 @@ Page({
     activeName: '',
     mode: 'cn',
     uploadLabel: '上传照片',
-    templateName: '极简白底',
-    currentTemplate: 'minimal',
+    templateName: '纯白',
+    currentTemplate: 'pure',
     posterText: '',
     nickname: '',
     avatarUrl: '',
