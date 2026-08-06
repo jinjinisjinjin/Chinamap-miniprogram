@@ -242,7 +242,7 @@ Page({
     showOnboard: false,
     onboardIndex: 0,
     onboardSteps: [
-      { emoji: '🗺️', title: '点亮地图', desc: '点省份或大洲，上传旅途照片，它就会亮起来', img: '/assets/onboard/step1.jpg' },
+      { emoji: '📸', title: '记录足迹', desc: '点省份或大洲，上传旅途照片，把去过的地方留下来', img: '/assets/onboard/step1.jpg' },
       { emoji: '🌍', title: '中国 ↔ 全球', desc: '右上角一键切换，去看更大的世界', img: '/assets/onboard/step2.jpg' },
       { emoji: '🎨', title: '生成海报', desc: '挑个喜欢的模板，生成专属旅行地图', img: '/assets/onboard/step3.jpg' },
       { emoji: '💌', title: '分享回忆', desc: '存相册或转发给朋友，把足迹留住', img: '/assets/onboard/step4.jpg' }
