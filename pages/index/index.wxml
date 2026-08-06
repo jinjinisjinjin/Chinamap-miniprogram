@@ -20,6 +20,7 @@
   <!-- 地图 -->
   <view class="map-stage">
     <canvas
+      wx:if="{{!showOnboard}}"
       type="2d"
       id="mapCanvas"
       class="map-canvas"

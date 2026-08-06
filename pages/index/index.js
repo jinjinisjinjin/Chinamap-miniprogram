@@ -281,10 +281,13 @@ Page({
   },
 
   onReady() {
-    this.initMapCanvas()
     this.initPosterCanvas()
-    // 热重载保险：延迟补一次重绘，避免首帧画布未就绪导致空白
-    setTimeout(() => this.renderMap(), 400)
+    // 首开引导期间地图 canvas 被 wx:if 销毁，不能初始化；关闭引导时再 init
+    if (!this.data.showOnboard) {
+      this.initMapCanvas()
+      // 热重载保险：延迟补一次重绘，避免首帧画布未就绪导致空白
+      setTimeout(() => this.renderMap(), 400)
+    }
     wx.showShareMenu({
       withShareTicket: true,
       menus: ['shareAppMessage', 'shareTimeline']
@@ -1936,6 +1939,8 @@ Page({
   onOnboardSkip() {
     this.setData({ showOnboard: false })
     wx.setStorageSync('onboarded', '1')
+    // 引导关闭后地图 canvas 被 wx:if 重新渲染，需重新初始化一次
+    this.initMapCanvas()
   },
   onShowOnboard() {
     this.setData({ showOnboard: true, onboardIndex: 0 })
