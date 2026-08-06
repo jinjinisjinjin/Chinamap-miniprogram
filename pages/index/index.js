@@ -1912,7 +1912,12 @@ Page({
     this.setData({ onboardIndex: e.detail.current })
   },
   onOnboardNext() {
-    const next = Math.min(this.data.onboardIndex + 1, this.data.onboardSteps.length - 1)
+    // 已是最后一张 → 视为"开始体验"，关闭引导
+    if (this.data.onboardIndex >= this.data.onboardSteps.length - 1) {
+      this.onOnboardSkip()
+      return
+    }
+    const next = this.data.onboardIndex + 1
     this.setData({ onboardIndex: next })
   },
   onOnboardSkip() {

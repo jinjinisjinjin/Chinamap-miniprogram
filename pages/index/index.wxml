@@ -258,7 +258,7 @@
         <view class="onboard-skip" bindtap="onOnboardSkip">跳过</view>
         <view
           class="onboard-next {{onboardIndex >= onboardSteps.length - 1 ? 'finish' : ''}}"
-          bindtap="{{onboardIndex >= onboardSteps.length - 1 ? 'onOnboardSkip' : 'onOnboardNext'}}"
+          bindtap="onOnboardNext"
         >{{onboardIndex >= onboardSteps.length - 1 ? '开始体验' : '下一步'}}</view>
       </view>
     </view>

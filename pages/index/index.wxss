@@ -624,7 +624,7 @@
   left: 0; top: 0; right: 0; bottom: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(20, 15, 10, 0.78);
+  background: #15110b;
   display: flex;
   align-items: center;
   justify-content: center;
