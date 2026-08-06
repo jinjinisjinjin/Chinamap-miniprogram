@@ -622,11 +622,13 @@
 .onboard-mask {
   position: fixed;
   left: 0; top: 0; right: 0; bottom: 0;
-  background: rgba(40, 33, 24, 0.55);
+  width: 100vw;
+  height: 100vh;
+  background: rgba(20, 15, 10, 0.78);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 9999;
 }
 .onboard-card {
   width: 580rpx;
