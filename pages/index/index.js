@@ -1920,6 +1920,11 @@ Page({
     const next = this.data.onboardIndex + 1
     this.setData({ onboardIndex: next })
   },
+  // 点分页指示器圆点 → 跳到对应引导卡
+  onOnboardDotTap(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    this.setData({ onboardIndex: index })
+  },
   // 只有点到蒙层自身（空白处）才关闭，卡片内点击不冒泡到此
   onOnboardMaskTap(e) {
     if (e.target === e.currentTarget) {

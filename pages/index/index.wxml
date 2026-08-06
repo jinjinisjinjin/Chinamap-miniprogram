@@ -252,6 +252,8 @@
           wx:for="{{onboardSteps}}"
           wx:key="title"
           class="onboard-dot {{index === onboardIndex ? 'active' : ''}}"
+          data-index="{{index}}"
+          bindtap="onOnboardDotTap"
         ></view>
       </view>
       <view class="onboard-actions">
